@@ -179,3 +179,42 @@ def resume_generate(target_role, years, background, api_key, base_url, model, mo
         return RESUME_MOCK
     user_msg = f"目标岗位：{target_role}\n工作年限：{years}\n原始背景/经历：\n{background}"
     return _call_llm(RESUME_SYSTEM, user_msg, api_key, base_url, model)
+
+
+# ===================== 签证要求聚合 (信息差版) =====================
+import json as _json
+import os as _os
+
+def load_visa_data():
+    """读取签证数据集, 返回 (meta, list[dict])。"""
+    path = _os.path.join(_os.path.dirname(__file__), "visa_data.json")
+    with open(path, "r", encoding="utf-8") as f:
+        data = _json.load(f)
+    return data.get("_meta", {}), data.get("countries", [])
+
+
+def visa_search(keyword="", region="全部", policy="全部"):
+    """按关键词(国家名) / 地区 / 签证类型筛选。返回 list[dict]。"""
+    _meta, countries = load_visa_data()
+    kw = keyword.strip().lower()
+    result = []
+    for c in countries:
+        if kw and kw not in c["country"].lower() and kw not in c.get("region", "").lower():
+            continue
+        if region != "全部" and c.get("region") != region:
+            continue
+        if policy != "全部" and c.get("policy") != policy:
+            continue
+        result.append(c)
+    return result
+
+
+def visa_regions():
+    _meta, countries = load_visa_data()
+    rs = sorted({c.get("region", "其他") for c in countries})
+    return ["全部"] + rs
+
+
+def visa_policies():
+    return ["全部", "免签", "免签/落地签", "落地签", "落地签/电子签", "电子签",
+            "电子旅行授权", "电子签/持美签免签", "需提前办理"]

@@ -1,0 +1,38 @@
+{
+  "_meta": {
+    "title": "中国护照出境签证政策聚合",
+    "updated": "2026-07",
+    "disclaimer": "本数据为公开信息整理示例，签证政策变动频繁，出行前务必以目的地驻华使领馆或官方签证平台最新公布为准。本工具不构成任何法律或出行建议。"
+  },
+  "countries": [
+    {"country":"泰国","flag":"🇹🇭","region":"东南亚","policy":"免签","stay":"30天","processing":"无需办理","fee_cny":0,"requirements":["有效护照（6个月以上）","往返机票","足够资金证明"],"official":"https://www.thaiembassy.com","note":"中泰互免签证，可停留30天，可续签一次。"},
+    {"country":"新加坡","flag":"🇸🇬","region":"东南亚","policy":"免签","stay":"30天","processing":"无需办理","fee_cny":0,"requirements":["有效护照（6个月以上）","往返机票"],"official":"https://www.ica.gov.sg","note":"中新互免签证，普通护照可停留30天。"},
+    {"country":"马来西亚","flag":"🇲🇾","region":"东南亚","policy":"免签","stay":"30天","processing":"无需办理","fee_cny":0,"requirements":["有效护照（6个月以上）","往返机票","住宿证明"],"official":"https://www.imi.gov.my","note":"对中国公民免签入境，停留不超过30天。"},
+    {"country":"印度尼西亚","flag":"🇮🇩","region":"东南亚","policy":"免签/落地签","stay":"30天","processing":"落地或免签","fee_cny":0,"requirements":["有效护照（6个月以上）","往返机票"],"official":"https://www.imigrasi.go.id","note":"巴厘岛等旅游目的地免签30天；其他可落地签。"},
+    {"country":"越南","flag":"🇻🇳","region":"东南亚","policy":"电子签","stay":"90天","processing":"3-5个工作日","fee_cny":200,"requirements":["护照扫描件","白底证件照","入境口岸信息"],"official":"https://evisa.xuatnhapcanh.gov.vn","note":"电子签（e-visa）单次/多次，最长90天。"},
+    {"country":"柬埔寨","flag":"🇰🇭","region":"东南亚","policy":"落地签/电子签","stay":"30天","processing":"落地即办","fee_cny":200,"requirements":["护照照片2张","落地签申请表","30美元现金"],"official":"https://www.evisa.gov.kh","note":"可落地签或提前电子签，旅游签30天。"},
+    {"country":"老挝","flag":"🇱🇦","region":"东南亚","policy":"落地签","stay":"30天","processing":"落地即办","fee_cny":150,"requirements":["护照照片","落地签申请表","美元现金"],"official":"https://www.lsb.gov.la","note":"主要口岸支持落地签，停留30天。"},
+    {"country":"尼泊尔","flag":"🇳🇵","region":"南亚","policy":"落地签","stay":"15/30/90天","processing":"落地即办","fee_cny":200,"requirements":["护照照片","落地签申请表","签证费美元现金"],"official":"https://www.immigration.gov.np","note":"加德满都机场及陆路口岸可落地签。"},
+    {"country":"斯里兰卡","flag":"🇱🇰","region":"南亚","policy":"电子签","stay":"30天","processing":"1-3个工作日","fee_cny":250,"requirements":["护照扫描件","证件照","行程单"],"official":"https://eta.gov.lk","note":"需提前申请ETA电子旅行许可。"},
+    {"country":"印度","flag":"🇮🇳","region":"南亚","policy":"电子签","stay":"30/60天","processing":"3-5个工作日","fee_cny":450,"requirements":["护照扫描件","白底照片","信用卡付款"],"official":"https://indianvisaonline.gov.in","note":"电子旅游签，需提前在线申请。"},
+    {"country":"阿联酋","flag":"🇦🇪","region":"中东","policy":"免签","stay":"30天","processing":"无需办理","fee_cny":0,"requirements":["有效护照（6个月以上）","往返机票"],"official":"https://icp.gov.ae","note":"中阿互免签证，可停留30天。"},
+    {"country":"卡塔尔","flag":"🇶🇦","region":"中东","policy":"免签","stay":"30天","processing":"无需办理","fee_cny":0,"requirements":["有效护照（6个月以上）"],"official":"https://portal.moi.gov.qa","note":"中国公民免签入境，停留30天。"},
+    {"country":"土耳其","flag":"🇹🇷","region":"中东","policy":"电子签","stay":"30天","processing":"即时","fee_cny":400,"requirements":["护照信息","信用卡付款"],"official":"https://www.evisa.gov.tr","note":"电子签可在线秒批，费用约60美元。"},
+    {"country":"埃及","flag":"🇪🇬","region":"非洲","policy":"落地签/电子签","stay":"30天","processing":"落地即办","fee_cny":200,"requirements":["护照照片","25美元签证费","酒店订单"],"official":"https://www.visa2egypt.gov.eg","note":"可落地签或电子签，建议提前电子签避免口岸排队。"},
+    {"country":"肯尼亚","flag":"🇰🇪","region":"非洲","policy":"电子签","stay":"90天","processing":"3-7个工作日","fee_cny":350,"requirements":["护照扫描件","黄热疫苗证明","行程单"],"official":"https://evisa.go.ke","note":"全面电子签，需提前申请。"},
+    {"country":"毛里求斯","flag":"🇲🇺","region":"非洲","policy":"免签","stay":"90天","processing":"无需办理","fee_cny":0,"requirements":["有效护照（6个月以上）","往返机票","酒店订单"],"official":"https://www.immigration.gov.mu","note":"中国公民免签，最长停留90天。"},
+    {"country":"塞尔维亚","flag":"🇷🇸","region":"欧洲","policy":"免签","stay":"30天","processing":"无需办理","fee_cny":0,"requirements":["有效护照（6个月以上）"],"official":"https://www.mfa.gov.rs","note":"中塞互免签证，每180天累计不超30天。"},
+    {"country":"波黑","flag":"🇧🇦","region":"欧洲","policy":"免签","stay":"90天","processing":"无需办理","fee_cny":0,"requirements":["有效护照（6个月以上）"],"official":"https://www.mvp.gov.ba","note":"免签，每180天累计不超90天。"},
+    {"country":"申根区(法/德/意等)","flag":"🇪🇺","region":"欧洲","policy":"需提前办理","stay":"90天/180天","processing":"5-15个工作日","fee_cny":600,"requirements":["护照","行程单/机酒","在职/财力证明","保险","指纹录入"],"official":"https://www.schengenvisainfo.com","note":"统一申根签证，覆盖多数西欧国家，需预约录指纹。"},
+    {"country":"英国","flag":"🇬🇧","region":"欧洲","policy":"需提前办理","stay":"6个月","processing":"15-30个工作日","fee_cny":1000,"requirements":["护照","资金证明","行程","在职/在读证明"],"official":"https://www.gov.uk/visa","note":"标准访客签，建议提前1-2个月申请。"},
+    {"country":"俄罗斯","flag":"🇷🇺","region":"欧洲","policy":"需提前办理","stay":"30天","processing":"5-10个工作日","fee_cny":400,"requirements":["护照","邀请函/酒店确认","照片"],"official":"https://visa.kdmid.ru","note":"团队游可免签；个人需邀请函办理。"},
+    {"country":"日本","flag":"🇯🇵","region":"东亚","policy":"需提前办理","stay":"90天","processing":"5-10个工作日","fee_cny":200,"requirements":["护照","在职/财力证明","行程","照片"],"official":"https://www.mofa.go.jp","note":"单次/三年/五年多次，需通过旅行社送签。"},
+    {"country":"韩国","flag":"🇰🇷","region":"东亚","policy":"需提前办理","stay":"90天","processing":"5-10个工作日","fee_cny":300,"requirements":["护照","在职/财力证明","行程"],"official":"https://www.visa.go.kr","note":"济州岛对中国公民免签30天；本土需提前办理。"},
+    {"country":"美国","flag":"🇺🇸","region":"北美","policy":"需提前办理","stay":"6个月/10年多次","processing":"面签约1-2个月","fee_cny":1100,"requirements":["护照","DS-160表","照片","面签","财力/在职证明"],"official":"https://travel.state.gov","note":"B1/B2通常签发10年多次，需面签。"},
+    {"country":"加拿大","flag":"🇨🇦","region":"北美","policy":"需提前办理","stay":"6个月/10年多次","processing":"15-40个工作日","fee_cny":600,"requirements":["护照","在职/财力证明","照片","生物采集"],"official":"https://www.canada.ca","note":"通常签发10年多次，需录指纹。"},
+    {"country":"墨西哥","flag":"🇲🇽","region":"北美","policy":"电子签/持美签免签","stay":"180天","processing":"3-10个工作日","fee_cny":300,"requirements":["护照","有效美/加/日/英签可免签","或电子授权"],"official":"https://www.inm.gob.mx","note":"持有效美签可免签入境，否则需电子授权。"},
+    {"country":"澳大利亚","flag":"🇦🇺","region":"大洋洲","policy":"需提前办理","stay":"3/12个月","processing":"15-30个工作日","fee_cny":700,"requirements":["护照","资金证明","在职/在读","保险"],"official":"https://immi.homeaffairs.gov.au","note":"600访客签，建议提前1-2个月申请。"},
+    {"country":"新西兰","flag":"🇳🇿","region":"大洋洲","policy":"电子旅行授权","stay":"3个月","processing":"即时-72小时","fee_cny":150,"requirements":["护照","NZeTA申请","国际游客税"],"official":"https://www.immigration.govt.nz","note":"需申请NZeTA电子旅行授权，费用较低。"},
+    {"country":"斐济","flag":"🇫🇯","region":"大洋洲","policy":"免签","stay":"30天","processing":"无需办理","fee_cny":0,"requirements":["有效护照（6个月以上）","往返机票"],"official":"https://www.immigration.gov.fj","note":"中国公民免签入境，停留30天。"}
+  ]
+}

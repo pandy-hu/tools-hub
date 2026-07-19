@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-"""三合一小工具站: PDF转Excel / Excel公式机器人 / AI简历生成器。
+"""小工具站: PDF转Excel / Excel公式机器人 / AI简历生成器 / 签证政策聚合。
 对标 StarterStory 成功案例, 可一键部署到 Streamlit Cloud 获得公开网址。"""
 import pandas as pd
 import streamlit as st
 from core import (
     pdf_extract_tables, pdf_tables_to_excel,
     formula_generate, resume_generate, PRESETS,
+    visa_search, visa_regions, visa_policies,
 )
 
 st.set_page_config(page_title="小工具站 · 三个能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -41,9 +42,9 @@ div.stButton > button {{ background:{PRIMARY}; color:#fff; font-weight:700; bord
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="big-title">🧰 小工具站</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub">三个对标海外成功案例的小工具，免费可用。上方切换。</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub">一组对标海外成功案例的小工具（含中国护照信息差版），免费可用。上方切换。</div>', unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4 = st.tabs(["📄 PDF转Excel", "📊 Excel公式", "📋 AI简历", "💡 关于/升级"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 PDF", "📊 公式", "📋 简历", "🛂 签证", "💡 关于"])
 
 # ---------------- Tab 1: PDF 转 Excel ----------------
 with tab1:
@@ -186,8 +187,58 @@ with tab3:
                          + f"\n\n【技能】\n" + "、".join(res.get("skills", [])) + f"\n\n【ATS建议】\n" + "\n".join(res.get("ats_tips", [])))
                 st.download_button("⬇️ 下载简历文本", full, file_name="我的AI简历.txt", mime="text/plain")
 
-# ---------------- Tab 4: 关于 / 升级 ----------------
+# ---------------- Tab 4: 签证要求聚合 (信息差版) ----------------
 with tab4:
+    st.markdown("### 🛂 中国护照签证政策聚合")
+    st.caption("把散落在各使馆官网的签证政策，汇成一张可搜索的表 —— 对标海外 $20K/月案例的「中文信息差」版。")
+
+    _meta, _ = (None, None)
+    try:
+        from core import load_visa_data
+        _meta, _ = load_visa_data()
+    except Exception:
+        _meta = {}
+    if _meta.get("disclaimer"):
+        st.warning("⚠️ " + _meta["disclaimer"], icon="ℹ️")
+
+    v_kw = st.text_input("🔍 搜国家 / 地区（如 泰国、欧洲）", key="v_kw", placeholder="输入国家名或地区")
+    vc1, vc2 = st.columns(2)
+    with vc1:
+        v_region = st.selectbox("按地区筛选", visa_regions(), key="v_region")
+    with vc2:
+        v_policy = st.selectbox("按签证类型筛选", visa_policies(), key="v_policy")
+
+    results = visa_search(v_kw, v_region, v_policy)
+    st.markdown(f"**共匹配 {len(results)} 个目的地**")
+
+    for c in results:
+        pol = c.get("policy", "")
+        if "免签" in pol and "需" not in pol:
+            badge = f'<span style="background:#e6f7ec;color:#1a9e54;padding:2px 10px;border-radius:20px;font-size:13px;font-weight:700;">{pol}</span>'
+        elif "需提前" in pol:
+            badge = f'<span style="background:#fdeaea;color:#d4380d;padding:2px 10px;border-radius:20px;font-size:13px;font-weight:700;">{pol}</span>'
+        else:
+            badge = f'<span style="background:#fff4e0;color:#b8770a;padding:2px 10px;border-radius:20px;font-size:13px;font-weight:700;">{pol}</span>'
+        fee = "免费" if not c.get("fee_cny") else f"约 ¥{c['fee_cny']}"
+        st.markdown(f"""
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:18px;font-weight:800;color:#1a2b4a;">{c.get('flag','')} {c.get('country','')} <span style="font-size:13px;color:#5b6b85;font-weight:500;">· {c.get('region','')}</span></div>
+            {badge}
+          </div>
+          <div style="margin-top:8px;color:#3a4a66;font-size:14px;">
+            🕒 可停留：<b>{c.get('stay','-')}</b> ｜ ⏱ 办理：{c.get('processing','-')} ｜ 💰 费用：<b>{fee}</b>
+          </div>
+          <div style="margin-top:6px;color:#5b6b85;font-size:13px;">{c.get('note','')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        with st.expander(f"📋 {c.get('country')} 所需材料 & 官方链接"):
+            for r in c.get("requirements", []):
+                st.markdown(f"- {r}")
+            st.markdown(f"🔗 官方参考：[{c.get('official','')}]({c.get('official','')})")
+
+# ---------------- Tab 5: 关于 / 升级 ----------------
+with tab5:
     st.markdown("### 💡 关于这个小工具站")
     st.markdown("""
     这是一组**对标海外成功案例**的小工具（灵感来自 StarterStory）：
