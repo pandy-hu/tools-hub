@@ -10,6 +10,22 @@ from core import (
 
 st.set_page_config(page_title="小工具站 · 三个能赚钱的小工具", page_icon="🧰", layout="centered")
 
+
+def get_cloud_key(provider):
+    """从 Streamlit Cloud Secrets 读取该服务商对应的密钥（云端已配置则免粘贴）。"""
+    mapping = {
+        "DeepSeek (推荐·便宜)": "DEEPSEEK_API_KEY",
+        "OpenAI": "OPENAI_API_KEY",
+        "通义千问": "DASHSCOPE_API_KEY",
+        "自定义": "CUSTOM_API_KEY",
+    }
+    name = mapping.get(provider)
+    try:
+        return st.secrets.get(name, "") if name else ""
+    except Exception:
+        return ""
+
+
 PRIMARY = "#2D6CDF"
 st.markdown(f"""
 <style>
@@ -73,7 +89,12 @@ with tab2:
     with st.container():
         st.markdown('<div class="card">', unsafe_allow_html=True)
         f_provider = st.selectbox("选择大模型", list(PRESETS.keys()), index=0, key="f_provider")
-        f_key = st.text_input("API Key（留空则演示模式）", type="password", key="f_key")
+        f_cloud_key = get_cloud_key(f_provider)
+        f_key = st.text_input("API Key（留空则演示模式）", type="password", value=f_cloud_key, key="f_key")
+        if f_cloud_key:
+            st.success("✅ 已检测到云端密钥，直接联网生成（无需粘贴）")
+        else:
+            st.caption("没填 Key 则走演示模式。也可在部署平台 Secrets 配置密钥后免填。")
         ca, cb = st.columns(2)
         with ca:
             f_url = st.text_input("API Base URL", value=PRESETS[f_provider]["base_url"], key="f_url")
@@ -121,7 +142,12 @@ with tab3:
     with st.container():
         st.markdown('<div class="card">', unsafe_allow_html=True)
         r_provider = st.selectbox("选择大模型", list(PRESETS.keys()), index=0, key="r_provider")
-        r_key = st.text_input("API Key（留空则演示模式）", type="password", key="r_key")
+        r_cloud_key = get_cloud_key(r_provider)
+        r_key = st.text_input("API Key（留空则演示模式）", type="password", value=r_cloud_key, key="r_key")
+        if r_cloud_key:
+            st.success("✅ 已检测到云端密钥，直接联网生成（无需粘贴）")
+        else:
+            st.caption("没填 Key 则走演示模式。也可在部署平台 Secrets 配置密钥后免填。")
         ra, rb = st.columns(2)
         with ra:
             r_url = st.text_input("API Base URL", value=PRESETS[r_provider]["base_url"], key="r_url")
@@ -180,4 +206,22 @@ with tab4:
         st.info("高级版（批量处理、API 接口、去演示限制、定制功能）即将推出。\n\n"
                  "想抢先体验或提需求：可在部署平台的 Secrets 里配置 `UPGRADE_URL` 指向你的购买/联系方式链接，"
                  "本页会自动显示升级按钮。")
+
+    # ---------------- 赞助 / 打赏 ----------------
+    st.markdown("### ☕ 赞助 / 打赏")
+    sponsor_url = st.secrets.get("SPONSOR_URL", "")
+    sponsor_text = st.secrets.get("SPONSOR_TEXT", "如果这个工具帮到了你，请我喝杯奶茶 ☕")
+    sponsor_icon = st.secrets.get("SPONSOR_ICON", "☕")
+    if sponsor_url:
+        st.markdown(f"""
+        <div class="card" style="text-align:center;">
+          <div style="font-size:15px;color:#1a2b4a;font-weight:600;">{sponsor_icon} {sponsor_text}</div>
+          <a href="{sponsor_url}" target="_blank" rel="noopener">
+            <button style="margin-top:12px;background:{PRIMARY};color:#fff;border:none;border-radius:10px;padding:11px 28px;font-weight:700;cursor:pointer;font-size:15px;">👉 去赞助</button>
+          </a>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("若想开通赞助收款：在部署平台 Secrets 配置 `SPONSOR_URL`（你的收款页链接，如爱发电 / 奶茶）"
+                 "与 `SPONSOR_TEXT`（按钮文案）、`SPONSOR_ICON`（图标 emoji），本页会自动出现赞助按钮。")
     st.markdown('<div class="foot">MVP · 由 WorkBuddy 生成 · 三个工具合成一站</div>', unsafe_allow_html=True)

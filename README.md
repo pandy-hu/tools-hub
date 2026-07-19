@@ -47,14 +47,36 @@ https://xxxx-tools-hub.streamlit.app
 
 ## 三、配置 Secrets（可选但重要）
 
-在 Streamlit Cloud 的 **App → Settings → Secrets** 里可填：
+在 Streamlit Cloud 的 **App → Manage app → Settings → Secrets** 里可填。
+格式是 TOML（每行 `键名 = "值"`）：
 
-| Key | 作用 |
-|-----|------|
-| `UPGRADE_URL` | 填你的购买/联系方式链接，站内「升级高级版」会自动显示按钮 |
-| `DEEPSEEK_KEY` 等 | 若想让所有访客直接用你的 Key 联网（谨慎，会消耗你的额度） |
+```toml
+# —— AI 密钥（填了之后全站访客免粘贴、直接联网；不填则访客需自己粘贴或走演示）——
+DEEPSEEK_API_KEY = "sk-你的deepseek密钥"
+OPENAI_API_KEY   = "sk-你的openai密钥"
+DASHSCOPE_API_KEY = "你的通义密钥"   # 仅用通义时填
 
-> 不填 Secrets 也能正常运行：PDF 工具免 Key；公式/简历工具访客自己填 Key，不填则走演示模式。
+# —— 赞助 / 打赏链接（填了站内自动出现赞助按钮）——
+SPONSOR_URL   = "https://afdian.com/a/你的主页"   # 爱发电/奶茶等收款页
+SPONSOR_TEXT  = "如果这个工具帮到了你，请我喝杯奶茶 ☕"
+SPONSOR_ICON  = "☕"
+
+# —— 升级高级版入口（可选）——
+UPGRADE_URL   = "https://你的购买或联系页"
+```
+
+| Secret 键名 | 对应服务商 | 作用 |
+|-----|------|------|
+| `DEEPSEEK_API_KEY` | DeepSeek（默认推荐） | 公式/简历工具联网生成 |
+| `OPENAI_API_KEY` | OpenAI | 同上，用 OpenAI 时 |
+| `DASHSCOPE_API_KEY` | 通义千问 | 同上，用通义时 |
+| `CUSTOM_API_KEY` | 自定义 | 选"自定义"服务商时 |
+| `SPONSOR_URL` | —— | 站内「赞助」按钮跳转的收款页 |
+| `SPONSOR_TEXT` / `SPONSOR_ICON` | —— | 赞助区文案与图标（可选） |
+| `UPGRADE_URL` | —— | 「升级高级版」按钮链接（可选） |
+
+> 不填 Secrets 也能正常运行：PDF 工具免 Key；公式/简历工具访客自己粘贴 Key，或留空走演示模式。
+> 把 Key 放进 Secrets 后，**所有访客都能直接联网用**，但会消耗你的额度——按需选择。
 
 ---
 
