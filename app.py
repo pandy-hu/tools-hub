@@ -48,10 +48,27 @@ div.stButton > button {{ background:{PRIMARY}; color:#fff; font-weight:700; bord
 st.markdown('<div class="big-title">🧰 小工具站</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub">一组对标海外成功案例的小工具（含中国护照信息差版），免费可用。上方切换。</div>', unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["📄 PDF", "📊 公式", "📋 简历", "🛂 签证", "📈 数据", "🗄️ 导入", "🎨 配图", "💡 关于"])
+# ---------------- 顶部导航：每行 6 个，超过自动换行 ----------------
+TOOLS = [
+    ("📄 PDF", "pdf"), ("📊 公式", "formula"), ("📋 简历", "resume"),
+    ("🛂 签证", "visa"), ("📈 数据", "data"), ("🗄️ 导入", "airtable"),
+    ("🎨 配图", "poster"), ("💡 关于", "about"),
+]
+PER_ROW = 6
+if "active_tool" not in st.session_state:
+    st.session_state["active_tool"] = "pdf"
+for _i in range(0, len(TOOLS), PER_ROW):
+    _cols = st.columns(PER_ROW)
+    for _j, (_label, _key) in enumerate(TOOLS[_i:_i + PER_ROW]):
+        with _cols[_j]:
+            _active = st.session_state["active_tool"] == _key
+            if st.button(_label, key="nav_" + _key, use_container_width=True,
+                         type="primary" if _active else "secondary"):
+                st.session_state["active_tool"] = _key
+st.markdown('<hr style="margin:14px 0;border:none;border-top:1px solid #e3ebfb;">', unsafe_allow_html=True)
 
 # ---------------- Tab 1: PDF 转 Excel ----------------
-with tab1:
+if st.session_state["active_tool"] == "pdf":
     st.markdown("### 📄 PDF 发票/账单 → Excel")
     st.caption("上传任意带表格的 PDF（发票、账单、银行流水、对账单），一键提取全部表格并导出 Excel。纯本地处理，文件不上传任何服务器。")
     with st.container():
@@ -88,7 +105,7 @@ with tab1:
                 st.caption(f"已生成工作表：{', '.join(sheets)}")
 
 # ---------------- Tab 2: Excel 公式机器人 ----------------
-with tab2:
+if st.session_state["active_tool"] == "formula":
     st.markdown("### 📊 Excel 公式生成机器人")
     st.caption("用大白话描述你想算什么，一键生成可直接粘贴进 Excel/WPS 的合法公式。填 Key 联网，不填则演示。")
     with st.container():
@@ -141,7 +158,7 @@ with tab2:
                 st.caption("复制上面公式框内容，直接粘到 Excel/WPS 单元格即可。")
 
 # ---------------- Tab 3: 中文 AI 简历生成器 ----------------
-with tab3:
+if st.session_state["active_tool"] == "resume":
     st.markdown("### 📋 中文 AI 简历生成器")
     st.caption("填目标岗位+经历，AI 帮你重写得更专业、量化、过 ATS。填 Key 联网，不填则演示。")
     with st.container():
@@ -192,7 +209,7 @@ with tab3:
                 st.download_button("⬇️ 下载简历文本", full, file_name="我的AI简历.txt", mime="text/plain")
 
 # ---------------- Tab 4: 签证要求聚合 (信息差版) ----------------
-with tab4:
+if st.session_state["active_tool"] == "visa":
     st.markdown("### 🛂 中国护照签证政策聚合")
     st.caption("把散落在各使馆官网的签证政策，汇成一张可搜索的表 —— 对标海外 $20K/月案例的「中文信息差」版。")
 
@@ -242,7 +259,7 @@ with tab4:
             st.markdown(f"🔗 官方参考：[{c.get('official','')}]({c.get('official','')})")
 
 # ---------------- Tab 5: 数据可视化 ----------------
-with tab5:
+if st.session_state["active_tool"] == "data":
     import io as _io
     st.markdown("### 📈 数据可视化小工具")
     st.caption("上传 CSV / Excel，自动识别字段，选个图表类型就出图。纯本地处理，数据不上传服务器。对标海外 $10K/月案例。")
@@ -311,7 +328,7 @@ with tab5:
                 pass
 
 # ---------------- Tab 6: CSV → Airtable 导入 ----------------
-with tab6:
+if st.session_state["active_tool"] == "airtable":
     st.markdown("### 🗄️ CSV → Airtable 导入")
     st.caption("把 Excel/CSV 数据一键灌进你的 Airtable 表。需你自己的 Airtable Token（数据直连 Airtable，不经本站服务器）。对标海外 $20K/月案例。")
     with st.container():
@@ -376,7 +393,7 @@ with tab6:
                                     st.caption(e)
 
 # ---------------- Tab 8: AI 配图 / 海报生成器 ----------------
-with tab8:
+if st.session_state["active_tool"] == "poster":
     st.markdown("### 🎨 AI 配图 / 海报生成器")
     st.caption("输入主题，选模板和尺寸，一键生成社媒配图（小红书 / 公众号 / YouTube / 朋友圈）。纯本地生成，免 Key；填 Key 还能让 AI 帮你写文案。")
     with st.container():
@@ -437,7 +454,7 @@ with tab8:
         st.caption("提示：下载后用浏览器打开，右键图片区域 → 截图，或按 Ctrl+P 打印成 PDF/PNG，即得高清配图。")
 
 # ---------------- Tab 7: 关于 / 升级 ----------------
-with tab7:
+if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
     st.markdown("""
     这是一组**对标海外成功案例**的小工具（灵感来自 StarterStory）：
