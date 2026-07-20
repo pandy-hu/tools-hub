@@ -471,3 +471,91 @@ def poster_copy(topic, api_key, base_url, model, mock=False):
         return POSTER_MOCK
     user_msg = f"内容主题：{topic}\n请为它写一张社媒配图的标题与标签。"
     return _call_llm(POSTER_SYSTEM, user_msg, api_key, base_url, model)
+
+
+# ===================== 图片处理工具箱 =====================
+def image_process(raw_bytes, *, fmt="保持原格式", quality=85, max_edge=0, watermark=None):
+    """处理单张图片，返回 (out_bytes, ext, w, h)。
+
+    fmt: 保持原格式 / JPG / PNG
+    quality: 1-95（仅对 JPG / 原格式为 JPEG 时生效）
+    max_edge: 最长边像素，0 表示不缩放
+    watermark: 水印文字（None / 空则不加水印）
+    """
+    import io
+    from PIL import Image, ImageDraw, ImageFont
+
+    img = Image.open(io.BytesIO(raw_bytes))
+    orig_format = (img.format or "JPEG").upper()
+    img = img.copy()  # 避免 "image file is closed" 问题
+
+    # 选输出格式 + 透明通道处理
+    if fmt == "JPG":
+        if img.mode in ("RGBA", "LA", "P"):
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            if img.mode == "P":
+                img = img.convert("RGBA")
+            mask = img.split()[-1] if img.mode in ("RGBA", "LA") else None
+            bg.paste(img, mask=mask)
+            img = bg
+        else:
+            img = img.convert("RGB")
+        save_fmt = "JPEG"
+    elif fmt == "PNG":
+        save_fmt = "PNG"
+    else:  # 保持原格式
+        # 本环境 PIL 未编译 WebP 编码，原图为 WebP 时退回 PNG
+        save_fmt = orig_format if orig_format in ("JPEG", "PNG", "BMP", "GIF") else "PNG"
+        if save_fmt == "JPEG":
+            img = img.convert("RGB")
+
+    # 缩放：只缩小不放大
+    if max_edge and max_edge > 0:
+        w, h = img.size
+        longest = max(w, h)
+        if longest > max_edge:
+            scale = max_edge / float(longest)
+            img = img.resize((int(round(w * scale)), int(round(h * scale))),
+                             Image.LANCZOS)
+
+    # 水印
+    if watermark and watermark.strip():
+        img = _add_watermark(img, watermark.strip())
+
+    out = io.BytesIO()
+    if save_fmt == "JPEG":
+        img.save(out, format="JPEG", quality=int(quality), optimize=True)
+    elif save_fmt == "PNG":
+        img.save(out, format="PNG", optimize=True)
+    else:
+        img.save(out, format=save_fmt, optimize=True)
+    return out.getvalue(), save_fmt.lower(), img.size[0], img.size[1]
+
+
+def _add_watermark(img, text):
+    """在右下角加半透明文字水印（带描边便于在任何底色上可读）。"""
+    from PIL import ImageDraw, ImageFont
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGB")
+    draw = ImageDraw.Draw(img, "RGBA")
+    fs = max(16, int(min(img.size) / 28))
+    try:
+        font = ImageFont.truetype("arial.ttf", fs)
+    except Exception:
+        try:
+            font = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", fs)
+        except Exception:
+            font = ImageFont.load_default()
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    x = img.width - tw - max(8, int(img.width * 0.03))
+    y = img.height - th - max(8, int(img.height * 0.03))
+    # 先画暗色描边/底，再画亮色字，保证对比度
+    draw.text((x + 2, y + 2), text, font=font, fill=(0, 0, 0, 150))
+    draw.text((x, y), text, font=font, fill=(255, 255, 255, 210))
+    return img
+
+
+def image_tool_formats():
+    """返回可选的输出格式列表。"""
+    return ["保持原格式", "JPG", "PNG"]

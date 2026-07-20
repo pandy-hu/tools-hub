@@ -11,6 +11,7 @@ from core import (
     airtable_list_tables, airtable_import,
     poster_themes, poster_sizes, generate_poster_html, poster_preview_html,
     poster_copy, PRESETS,
+    image_process, image_tool_formats,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -52,7 +53,7 @@ st.markdown('<div class="sub">一组对标海外成功案例的小工具（含�
 TOOLS = [
     ("📄 PDF", "pdf"), ("📊 公式", "formula"), ("📋 简历", "resume"),
     ("🛂 签证", "visa"), ("📈 数据", "data"), ("🗄️ 导入", "airtable"),
-    ("🎨 配图", "poster"), ("💡 关于", "about"),
+    ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("💡 关于", "about"),
 ]
 PER_ROW = 6
 if "active_tool" not in st.session_state:
@@ -468,6 +469,56 @@ if st.session_state["active_tool"] == "poster":
         st.download_button("⬇️ 下载配图 HTML", data=poster, file_name="我的配图.html", mime="text/html")
         st.caption("提示：下载后用浏览器打开，右键图片区域 → 截图，或按 Ctrl+P 打印成 PDF/PNG，即得高清配图。")
 
+# ---------------- Tab 9: 图片处理工具箱 ----------------
+if st.session_state["active_tool"] == "image":
+    import io as _io
+    import zipfile
+    st.markdown("### 🖼️ 图片处理工具箱")
+    st.caption("上传图片，一键压缩体积、改尺寸、转格式、加水印。纯本地处理，文件不上传服务器。对标海外图片压缩类小工具（$5K-20K/月）。")
+    with st.container():
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        imgs = st.file_uploader("拖入或点击上传图片（可多选）", type=["png", "jpg", "jpeg", "webp", "bmp", "gif"],
+                                accept_multiple_files=True, key="img_up")
+        if1, if2 = st.columns(2)
+        with if1:
+            fmt = st.selectbox("输出格式", image_tool_formats(), key="img_fmt")
+        with if2:
+            quality = st.slider("压缩质量 (JPG 生效)", 10, 95, 82, key="img_q")
+        ie1, ie2 = st.columns(2)
+        with ie1:
+            max_edge = st.number_input("最长边像素 (0=不缩放)", min_value=0, max_value=4000, value=0, step=50, key="img_edge")
+        with ie2:
+            wm = st.text_input("水印文字（可选，如 © 小工具站）", key="img_wm")
+        st.markdown('</div>', unsafe_allow_html=True)
+    if imgs:
+        st.success(f"✅ 已选择 {len(imgs)} 张图片")
+        if st.button("🚀 处理并打包下载", use_container_width=True, key="img_go"):
+            results = []
+            with st.spinner("处理中…"):
+                for f in imgs:
+                    raw = f.read()
+                    try:
+                        out, ext, w, h = image_process(raw, fmt=fmt, quality=quality,
+                                                       max_edge=max_edge, watermark=wm)
+                        results.append((f.name, out, ext, w, h, len(raw), len(out)))
+                    except Exception as e:
+                        st.error(f"处理失败 {f.name}：{e}")
+            if results:
+                for name, out, ext, w, h, orig, new in results:
+                    ratio = (1 - new / float(orig)) * 100 if orig else 0
+                    st.markdown(f"**{name}** → {w}×{h}px，{ext.upper()}，体积 {orig // 1024}KB → {new // 1024}KB（省 {ratio:.0f}%）")
+                    st.image(out, caption=name, use_container_width=True)
+                    st.download_button(f"⬇️ 下载 {name}", data=out,
+                                       file_name=name.rsplit('.', 1)[0] + '.' + ext,
+                                       mime=f"image/{ext}", key="dl_" + name)
+                if len(results) > 1:
+                    zbuf = _io.BytesIO()
+                    with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as z:
+                        for name, out, ext, w, h, orig, new in results:
+                            z.writestr(name.rsplit('.', 1)[0] + '.' + ext, out)
+                    st.download_button("⬇️ 打包下载全部 (ZIP)", data=zbuf.getvalue(),
+                                       file_name="小工具站_图片.zip", mime="application/zip")
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
@@ -481,6 +532,7 @@ if st.session_state["active_tool"] == "about":
     - 📈 **数据可视化小工具** —— 对标海外 $10K/月案例
     - 🗄️ **CSV → Airtable 导入** —— 对标海外 $20K/月案例（你带自己的 Token）
     - 🎨 **AI 配图 / 海报生成器** —— 对标社媒配图类小工具（$5K-20K/月，本地生成免 Key）
+    - 🖼️ **图片处理工具箱** —— 对标海外图片压缩类小工具（$5K-20K/月，本地免 Key）
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)
