@@ -575,17 +575,35 @@ def image_tool_formats():
 # ===================== 二维码生成器 =====================
 def qr_generate(text, *, box_size=10, border=4, error_correction="M",
                 fg_color="#000000", bg_color="#FFFFFF", logo_bytes=None,
-                logo_scale=0.22):
+                logo_scale=0.20):
     """生成二维码，返回 (png_bytes, size_px)。
 
     error_correction: L(7%) / M(15%) / Q(25%) / H(30%) 容错率
     logo_bytes: 可选的中心 Logo 图片字节（PNG/JPG）
     logo_scale: Logo 占二维码边长的比例（0-0.3）
+                  加 Logo 时会自动限制：L≤0.06 / M≤0.12 / Q≤0.18 / H≤0.25，
+                  超限时自动升级容错率保证可扫。
     """
     if not _QR_AVAILABLE:
         raise EnvironmentError("二维码需要 qrcode 库，请确认 requirements.txt 中包含 qrcode")
     if not text or not text.strip():
         raise ValueError("二维码内容不能为空")
+
+    # 各容错率允许的最大 Logo 比例（留安全余量）
+    ec_max_logo = {"L": 0.06, "M": 0.12, "Q": 0.18, "H": 0.25}
+    ec_order = ["L", "M", "Q", "H"]
+
+    # 如果有 Logo 且当前容错率放不下 → 自动升级
+    if logo_bytes and float(logo_scale) > ec_max_logo.get(error_correction, 0):
+        for higher in ec_order:
+            if ec_order.index(higher) > ec_order.index(error_correction):
+                if float(logo_scale) <= ec_max_logo.get(higher, 0.30):
+                    error_correction = higher
+                    break
+
+    # 最终安全上限（不超过当前容错率可恢复范围）
+    safe_max = ec_max_logo.get(error_correction, 0.25)
+    actual_scale = min(float(logo_scale), safe_max)
 
     ec_map = {
         "L": qrcode.constants.ERROR_CORRECT_L,
@@ -595,7 +613,7 @@ def qr_generate(text, *, box_size=10, border=4, error_correction="M",
     }
     qr = qrcode.QRCode(
         version=None,
-        error_correction=ec_map.get(error_correction, qrcode.constants.ERROR_CORRECT_M),
+        error_correction=ec_map[error_correction],
         box_size=box_size,
         border=border,
     )
@@ -603,27 +621,26 @@ def qr_generate(text, *, box_size=10, border=4, error_correction="M",
     qr.make(fit=True)
 
     if not _PIL_AVAILABLE:
-        # 极端情况下 PIL 不可用：退回纯二维码 PNG（无配色/Logo）
         img = qr.make_image(fill_color="black", back_color="white")
     else:
         img = qr.make_image(fill_color=fg_color, back_color=bg_color).convert("RGB")
 
-    # 中心 Logo（需 PIL）
-    if logo_bytes and _PIL_AVAILABLE:
+    # 中心 Logo（需 PIL）—— 用安全缩放比例
+    if logo_bytes and _PIL_AVAILABLE and actual_scale > 0:
         try:
             logo = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
             qr_w, qr_h = img.size
-            logo_size = int(min(qr_w, qr_h) * float(logo_scale))
-            logo_size = max(20, logo_size)
+            logo_size = int(min(qr_w, qr_h) * actual_scale)
+            logo_size = max(16, logo_size)
             logo = logo.resize((logo_size, logo_size), Image.LANCZOS)
-            # 白底圆角衬底，保证 Logo 在任何底色上清晰
-            pad = int(logo_size * 0.12)
-            plate = Image.new("RGBA", (logo_size + pad * 2, logo_size + pad * 2), (255, 255, 255, 255))
+            pad = max(4, int(logo_size * 0.10))
+            plate = Image.new("RGBA", (logo_size + pad * 2, logo_size + pad * 2),
+                              (255, 255, 255, 255))
             plate.paste(logo, (pad, pad), logo)
             px, py = (qr_w - plate.width) // 2, (qr_h - plate.height) // 2
             img.paste(plate, (px, py), plate)
         except Exception:
-            pass  # Logo 失败不影响主二维码
+            pass
 
     out = io.BytesIO()
     img.save(out, format="PNG")

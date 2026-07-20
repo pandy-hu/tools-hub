@@ -43,7 +43,7 @@ st.markdown(f"""
 .sec {{ font-weight:700; color:{PRIMARY}; margin:14px 0 4px; font-size:15px; }}
 .box {{ background:#fff; border:1px solid #e3ebfb; border-radius:10px; padding:12px 14px; }}
 .foot {{ color:#9aa7bd; font-size:12px; margin-top:24px; text-align:center; }}
-div.stButton > button {{ background:{PRIMARY}; color:#fff; font-weight:700; border-radius:10px; padding:10px 22px; }}
+div.stButton > button {{ background:{PRIMARY}; color:#fff; font-weight:700; border-radius:10px; padding:10px 22px; white-space:nowrap; }}
 </style>
 """, unsafe_allow_html=True)
 
