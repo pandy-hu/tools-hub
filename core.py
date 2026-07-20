@@ -10,6 +10,12 @@ import requests
 from urllib.parse import quote
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    _PIL_AVAILABLE = True
+except Exception:
+    _PIL_AVAILABLE = False
+
 # ===================== PDF 转 Excel =====================
 def pdf_extract_tables(pdf_bytes):
     """返回 [(页码, 表序号, 二维表)] —— 二维表为 list[list[str|None]]。"""
@@ -482,8 +488,8 @@ def image_process(raw_bytes, *, fmt="保持原格式", quality=85, max_edge=0, w
     max_edge: 最长边像素，0 表示不缩放
     watermark: 水印文字（None / 空则不加水印）
     """
-    import io
-    from PIL import Image, ImageDraw, ImageFont
+    if not _PIL_AVAILABLE:
+        raise EnvironmentError("图片处理需要 Pillow 库，请确认 requirements.txt 中包含 Pillow")
 
     img = Image.open(io.BytesIO(raw_bytes))
     orig_format = (img.format or "JPEG").upper()
@@ -534,7 +540,6 @@ def image_process(raw_bytes, *, fmt="保持原格式", quality=85, max_edge=0, w
 
 def _add_watermark(img, text):
     """在右下角加半透明文字水印（带描边便于在任何底色上可读）。"""
-    from PIL import ImageDraw, ImageFont
     if img.mode not in ("RGB", "RGBA"):
         img = img.convert("RGB")
     draw = ImageDraw.Draw(img, "RGBA")
