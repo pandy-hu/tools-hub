@@ -380,7 +380,9 @@ def generate_poster_html(title, subtitle, theme, size, footer, tags):
     """生成一张可直接在浏览器渲染的配图 HTML（中文用系统字体，无需字体文件）。"""
     th = POSTER_THEMES.get(theme, POSTER_THEMES["商务蓝"])
     w, h = POSTER_SIZES.get(size, (1080, 1350))
-    font_stack = '"PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif'
+    # 注意：此处不能用双引号包裹字体名，因为 font_stack 会被嵌入
+    # style="..." 双引号属性中，内层双引号会导致 HTML 解析断裂、CSS 原样泄露为可见文字。
+    font_stack = "'PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif"
 
     tag_html = ""
     if tags:

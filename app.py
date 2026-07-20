@@ -406,9 +406,12 @@ if st.session_state["active_tool"] == "poster":
         with pb:
             p_size = st.selectbox("尺寸 / 平台", poster_sizes(), key="p_size")
         p_title = st.text_input("大标题（留空则 AI 写 / 用主题）", key="p_title",
-                                placeholder="例如：3 个被低估的赚钱小工具")
-        p_sub = st.text_input("小标签（可选，如：信息差·副业）", key="p_sub")
-        p_tags = st.text_input("标签（用逗号分隔，可选）", key="p_tags", placeholder="副业,AI工具,信息差")
+                                placeholder="例如：3 个被低估的赚钱小工具",
+                                value=st.session_state.get("ai_title", ""))
+        p_sub = st.text_input("小标签（可选，如：信息差·副业）", key="p_sub",
+                               value=st.session_state.get("ai_sub", ""))
+        p_tags = st.text_input("标签（用逗号分隔，可选）", key="p_tags", placeholder="副业,AI工具,信息差",
+                                value=st.session_state.get("ai_tags", ""))
         p_footer = st.text_input("底部署名（可选，如：by 小工具站）", key="p_footer")
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -432,17 +435,21 @@ if st.session_state["active_tool"] == "poster":
                     try:
                         cp = poster_copy(p_topic, p_key, p_url, p_model,
                                          mock=(not p_key.strip()) or (not p_url.strip()))
-                        st.session_state["p_title"] = cp.get("title", p_topic)
-                        st.session_state["p_sub"] = cp.get("subtitle", "")
-                        st.session_state["p_tags"] = "，".join(cp.get("tags", []))
+                        # 写到独立 key（不用 widget 绑定的 p_title/p_sub/p_tags，
+                        # 否则 Streamlit 报错 "cannot be modified after widget instantiated"）
+                        st.session_state["ai_title"] = cp.get("title", p_topic)
+                        st.session_state["ai_sub"] = cp.get("subtitle", "")
+                        st.session_state["ai_tags"] = ",".join(cp.get("tags", []))
                         st.rerun()
                     except Exception as e:
                         st.error(f"AI 文案失败：{e}")
 
     if st.button("🚀 生成配图", use_container_width=True, key="p_go"):
-        title = (p_title or p_topic or "我的配图").strip()
-        sub = p_sub.strip()
-        tags = [t.strip() for t in p_tags.split(",") if t.strip()] if p_tags else []
+        # 优先用 AI 生成的文案，fallback 到用户手填
+        title = (st.session_state.get("ai_title") or p_title or p_topic or "我的配图").strip()
+        sub = (st.session_state.get("ai_sub") or p_sub).strip()
+        _ai_tags = st.session_state.get("ai_tags", "")
+        tags = [t.strip() for t in (_ai_tags if _ai_tags else p_tags).split(",") if t.strip()] if (_ai_tags or p_tags) else []
         footer = p_footer.strip()
         poster = generate_poster_html(title, sub, p_theme, p_size, footer, tags)
         # 取真实尺寸用于预览缩放
