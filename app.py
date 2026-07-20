@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""小工具站: PDF转Excel / Excel公式机器人 / AI简历生成器 / 签证政策聚合。
+"""小工具站: PDF转Excel / Excel公式机器人 / AI简历生成器 / 签证政策聚合 / 数据可视化 / Airtable导入。
 对标 StarterStory 成功案例, 可一键部署到 Streamlit Cloud 获得公开网址。"""
 import pandas as pd
 import streamlit as st
@@ -8,6 +8,7 @@ from core import (
     formula_generate, resume_generate, PRESETS,
     visa_search, visa_regions, visa_policies,
     viz_load_data, viz_is_numeric, viz_make_figure,
+    airtable_list_tables, airtable_import,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -45,7 +46,7 @@ div.stButton > button {{ background:{PRIMARY}; color:#fff; font-weight:700; bord
 st.markdown('<div class="big-title">🧰 小工具站</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub">一组对标海外成功案例的小工具（含中国护照信息差版），免费可用。上方切换。</div>', unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📄 PDF", "📊 公式", "📋 简历", "🛂 签证", "📈 数据", "💡 关于"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📄 PDF", "📊 公式", "📋 简历", "🛂 签证", "📈 数据", "🗄️ 导入", "💡 关于"])
 
 # ---------------- Tab 1: PDF 转 Excel ----------------
 with tab1:
@@ -307,8 +308,73 @@ with tab5:
             except Exception:
                 pass
 
-# ---------------- Tab 6: 关于 / 升级 ----------------
+# ---------------- Tab 6: CSV → Airtable 导入 ----------------
 with tab6:
+    st.markdown("### 🗄️ CSV → Airtable 导入")
+    st.caption("把 Excel/CSV 数据一键灌进你的 Airtable 表。需你自己的 Airtable Token（数据直连 Airtable，不经本站服务器）。对标海外 $20K/月案例。")
+    with st.container():
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        a_file = st.file_uploader("上传 CSV / Excel", type=["csv", "xlsx", "xls"], key="at_up")
+        a_token = st.text_input("Airtable Token（以 pat 或 key 开头）", type="password", key="at_token")
+        a_base = st.text_input("Base ID（形如 appXXXX）", key="at_base", placeholder="appXXXXXXXXXXXXXX")
+        a_dry = st.checkbox("演练模式（只模拟、不真实写入）", value=True, key="at_dry")
+        st.markdown('</div>', unsafe_allow_html=True)
+    if a_file is not None:
+        try:
+            a_df = viz_load_data(a_file.read(), a_file.name)
+        except Exception as e:
+            st.error(f"读取失败：{e}")
+            a_df = None
+        if a_df is not None:
+            st.success(f"✅ 已加载 {len(a_df)} 行 × {len(a_df.columns)} 列")
+            if st.button("🔗 获取表结构", key="at_fetch"):
+                if not (a_token and a_base):
+                    st.warning("请先填 Token 和 Base ID")
+                else:
+                    with st.spinner("拉取表结构…"):
+                        try:
+                            tbls = airtable_list_tables(a_token, a_base)
+                            st.session_state["at_tables"] = tbls
+                            st.success(f"✅ 找到 {len(tbls)} 张表")
+                        except Exception as e:
+                            st.error(f"获取失败：{e}")
+            tbls = st.session_state.get("at_tables", [])
+            if tbls:
+                tnames = [t["name"] for t in tbls]
+                a_tname = st.selectbox("选择目标表", tnames, key="at_tname")
+                sel = next((t for t in tbls if t["name"] == a_tname), None)
+                if sel:
+                    st.markdown("**字段映射**（CSV 列 → Airtable 字段）：")
+                    mapping = {}
+                    for f in sel["fields"]:
+                        mapping[f["name"]] = st.selectbox(
+                            f"🔑 {f['name']}（{f['type']}）", ["(忽略)"] + list(a_df.columns),
+                            key="map_" + str(f["name"]))
+                    if st.button("🚀 开始导入", use_container_width=True, key="at_go"):
+                        records = []
+                        for _, row in a_df.iterrows():
+                            rec = {}
+                            for fname, cname in mapping.items():
+                                if cname != "(忽略)" and pd.notna(row[cname]):
+                                    rec[fname] = str(row[cname])
+                            if rec:
+                                records.append(rec)
+                        if not records:
+                            st.warning("没有可导入的数据，请检查字段映射～")
+                        elif a_dry:
+                            st.info(f"🧪 演练模式：将向表「{a_tname}」写入 {len(records)} 条记录（未真实写入）。取消勾选「演练模式」后再次点击即可真实导入。")
+                        else:
+                            with st.spinner(f"导入中（{len(records)} 条）…"):
+                                res = airtable_import(a_token, a_base, a_tname, records, dry_run=False)
+                            if res["failed"] == 0:
+                                st.success(f"✅ 导入成功 {res['success']} 条")
+                            else:
+                                st.warning(f"成功 {res['success']} 条，失败 {res['failed']} 条")
+                                for e in res["errors"][:5]:
+                                    st.caption(e)
+
+# ---------------- Tab 7: 关于 / 升级 ----------------
+with tab7:
     st.markdown("### 💡 关于这个小工具站")
     st.markdown("""
     这是一组**对标海外成功案例**的小工具（灵感来自 StarterStory）：
@@ -318,8 +384,9 @@ with tab6:
     - 📋 **中文 AI 简历生成器** —— 对标 Rezi $215K/月（中文差异化版）
     - 🛂 **中国护照签证政策聚合** —— 对标海外 $20K/月案例（信息差版）
     - 📈 **数据可视化小工具** —— 对标海外 $10K/月案例
+    - 🗄️ **CSV → Airtable 导入** —— 对标海外 $20K/月案例（你带自己的 Token）
 
-    全部免费可用。PDF / 签证 / 数据 工具本地运行、无需 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
+    全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)
     upgrade_url = st.secrets.get("UPGRADE_URL", "")
     st.markdown("### 🔓 升级高级版")

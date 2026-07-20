@@ -3,9 +3,11 @@
 与 UI 解耦, 便于测试与在 Streamlit Cloud 上部署。"""
 import io
 import json
+import time
 import pandas as pd
 import pdfplumber
 import requests
+from urllib.parse import quote
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 # ===================== PDF 转 Excel =====================
@@ -291,3 +293,52 @@ def viz_make_figure(df, chart_type, x_col, y_cols, title="", agg="不聚合", to
         legend=dict(orientation="h", y=-0.2),
     )
     return fig
+
+
+# ===================== CSV → Airtable 导入 =====================
+def airtable_list_tables(token, base_id):
+    """拉取 base 下的表结构。返回 list[{name, id, fields:[{name,type}]}]。"""
+    url = f"https://api.airtable.com/v0/meta/bases/{base_id}/tables"
+    headers = {"Authorization": f"Bearer {token}"}
+    r = requests.get(url, headers=headers, timeout=20)
+    r.raise_for_status()
+    data = r.json()
+    out = []
+    for t in data.get("tables", []):
+        out.append({
+            "name": t.get("name"),
+            "id": t.get("id"),
+            "fields": [{"name": f.get("name"), "type": f.get("type")} for f in t.get("fields", [])],
+        })
+    return out
+
+
+def airtable_import(token, base_id, table_name, records, dry_run=False, batch=10):
+    """把已映射好的 records 批量写入 Airtable。
+
+    records: list[dict]，每个 dict 是 {字段名: 值}。
+    dry_run=True 时只模拟、不真实写入（用于演示流程）。
+    返回 dict: {success, failed, errors, dry}。
+    """
+    if dry_run:
+        return {"success": len(records), "failed": 0, "errors": [], "dry": True}
+    url = f"https://api.airtable.com/v0/{base_id}/{quote(table_name)}"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    ok = 0
+    failed = 0
+    errors = []
+    for i in range(0, len(records), batch):
+        chunk = records[i:i + batch]
+        payload = {"records": [{"fields": rec} for rec in chunk], "typecast": True}
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=30)
+            if r.status_code in (200, 201):
+                ok += len(chunk)
+            else:
+                failed += len(chunk)
+                errors.append(f"批次 {i // batch + 1}: HTTP {r.status_code} {r.text[:200]}")
+        except Exception as e:
+            failed += len(chunk)
+            errors.append(f"批次 {i // batch + 1}: {e}")
+        time.sleep(0.25)  # 尊重 Airtable 限速（5 次/秒）
+    return {"success": ok, "failed": failed, "errors": errors}
