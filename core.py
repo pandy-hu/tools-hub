@@ -16,6 +16,12 @@ try:
 except Exception:
     _PIL_AVAILABLE = False
 
+try:
+    import qrcode
+    _QR_AVAILABLE = True
+except Exception:
+    _QR_AVAILABLE = False
+
 # ===================== PDF 转 Excel =====================
 def pdf_extract_tables(pdf_bytes):
     """返回 [(页码, 表序号, 二维表)] —— 二维表为 list[list[str|None]]。"""
@@ -564,3 +570,61 @@ def _add_watermark(img, text):
 def image_tool_formats():
     """返回可选的输出格式列表。"""
     return ["保持原格式", "JPG", "PNG"]
+
+
+# ===================== 二维码生成器 =====================
+def qr_generate(text, *, box_size=10, border=4, error_correction="M",
+                fg_color="#000000", bg_color="#FFFFFF", logo_bytes=None,
+                logo_scale=0.22):
+    """生成二维码，返回 (png_bytes, size_px)。
+
+    error_correction: L(7%) / M(15%) / Q(25%) / H(30%) 容错率
+    logo_bytes: 可选的中心 Logo 图片字节（PNG/JPG）
+    logo_scale: Logo 占二维码边长的比例（0-0.3）
+    """
+    if not _QR_AVAILABLE:
+        raise EnvironmentError("二维码需要 qrcode 库，请确认 requirements.txt 中包含 qrcode")
+    if not text or not text.strip():
+        raise ValueError("二维码内容不能为空")
+
+    ec_map = {
+        "L": qrcode.constants.ERROR_CORRECT_L,
+        "M": qrcode.constants.ERROR_CORRECT_M,
+        "Q": qrcode.constants.ERROR_CORRECT_Q,
+        "H": qrcode.constants.ERROR_CORRECT_H,
+    }
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=ec_map.get(error_correction, qrcode.constants.ERROR_CORRECT_M),
+        box_size=box_size,
+        border=border,
+    )
+    qr.add_data(text.strip())
+    qr.make(fit=True)
+
+    if not _PIL_AVAILABLE:
+        # 极端情况下 PIL 不可用：退回纯二维码 PNG（无配色/Logo）
+        img = qr.make_image(fill_color="black", back_color="white")
+    else:
+        img = qr.make_image(fill_color=fg_color, back_color=bg_color).convert("RGB")
+
+    # 中心 Logo（需 PIL）
+    if logo_bytes and _PIL_AVAILABLE:
+        try:
+            logo = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+            qr_w, qr_h = img.size
+            logo_size = int(min(qr_w, qr_h) * float(logo_scale))
+            logo_size = max(20, logo_size)
+            logo = logo.resize((logo_size, logo_size), Image.LANCZOS)
+            # 白底圆角衬底，保证 Logo 在任何底色上清晰
+            pad = int(logo_size * 0.12)
+            plate = Image.new("RGBA", (logo_size + pad * 2, logo_size + pad * 2), (255, 255, 255, 255))
+            plate.paste(logo, (pad, pad), logo)
+            px, py = (qr_w - plate.width) // 2, (qr_h - plate.height) // 2
+            img.paste(plate, (px, py), plate)
+        except Exception:
+            pass  # Logo 失败不影响主二维码
+
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue(), img.size[0]

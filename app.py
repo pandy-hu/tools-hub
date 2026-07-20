@@ -12,6 +12,7 @@ from core import (
     poster_themes, poster_sizes, generate_poster_html, poster_preview_html,
     poster_copy, PRESETS,
     image_process, image_tool_formats,
+    qr_generate,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -53,7 +54,7 @@ st.markdown('<div class="sub">一组对标海外成功案例的小工具（含�
 TOOLS = [
     ("📄 PDF", "pdf"), ("📊 公式", "formula"), ("📋 简历", "resume"),
     ("🛂 签证", "visa"), ("📈 数据", "data"), ("🗄️ 导入", "airtable"),
-    ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("💡 关于", "about"),
+    ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("🔳 二维码", "qr"), ("💡 关于", "about"),
 ]
 PER_ROW = 6
 if "active_tool" not in st.session_state:
@@ -519,6 +520,39 @@ if st.session_state["active_tool"] == "image":
                     st.download_button("⬇️ 打包下载全部 (ZIP)", data=zbuf.getvalue(),
                                        file_name="小工具站_图片.zip", mime="application/zip")
 
+# ---------------- Tab 9: 二维码生成器 ----------------
+if st.session_state["active_tool"] == "qr":
+    st.markdown("### 🔳 二维码生成器")
+    st.markdown("输入文字或网址，一键生成可下载的二维码。纯本地、免 Key。")
+
+    q_text = st.text_area("二维码内容（网址 / 文字 / 微信名片均可）", key="qr_text",
+                          height=90, placeholder="例如：https://pandy-hu-tools-hub-app-ux8bug.streamlit.app")
+    c1, c2 = st.columns(2)
+    with c1:
+        q_ec = st.selectbox("容错率", ["M", "L", "Q", "H"], index=0,
+                            help="越高越抗污损，但图案越密。带 Logo 建议选 H。", key="qr_ec")
+        q_box = st.slider("清晰度（像素密度）", 4, 16, 10, key="qr_box")
+    with c2:
+        q_fg = st.color_picker("前景色", "#000000", key="qr_fg")
+        q_bg = st.color_picker("背景色", "#FFFFFF", key="qr_bg")
+    q_logo = st.file_uploader("中心 Logo（可选，PNG/JPG）", type=["png", "jpg", "jpeg"],
+                              key="qr_logo")
+
+    if st.button("🚀 生成二维码", use_container_width=True, key="qr_go"):
+        if not q_text.strip():
+            st.warning("先填一下二维码内容～")
+        else:
+            with st.spinner("生成中…"):
+                try:
+                    logo_b = q_logo.getvalue() if q_logo else None
+                    png, size = qr_generate(q_text, box_size=q_box, error_correction=q_ec,
+                                            fg_color=q_fg, bg_color=q_bg, logo_bytes=logo_b)
+                    st.image(png, width=min(360, size))
+                    st.download_button("⬇️ 下载 PNG", data=png, file_name="qrcode.png",
+                                       mime="image/png", use_container_width=True)
+                except Exception as e:
+                    st.error(f"生成失败：{e}")
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
@@ -533,6 +567,7 @@ if st.session_state["active_tool"] == "about":
     - 🗄️ **CSV → Airtable 导入** —— 对标海外 $20K/月案例（你带自己的 Token）
     - 🎨 **AI 配图 / 海报生成器** —— 对标社媒配图类小工具（$5K-20K/月，本地生成免 Key）
     - 🖼️ **图片处理工具箱** —— 对标海外图片压缩类小工具（$5K-20K/月，本地免 Key）
+    - 🔳 **二维码生成器** —— 对标海外引流/营销类小工具（本地免 Key）
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)
