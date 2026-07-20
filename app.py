@@ -405,14 +405,20 @@ if st.session_state["active_tool"] == "poster":
             p_theme = st.selectbox("配色模板", poster_themes(), key="p_theme")
         with pb:
             p_size = st.selectbox("尺寸 / 平台", poster_sizes(), key="p_size")
+        # 把 AI 生成的文案同步进输入框：必须在下面的 widget 实例化之前执行一次
+        if st.session_state.get("ai_synced"):
+            st.session_state["p_title"] = st.session_state.get("ai_title", "")
+            st.session_state["p_sub"] = st.session_state.get("ai_sub", "")
+            st.session_state["p_tags"] = st.session_state.get("ai_tags", "")
+            st.session_state["ai_synced"] = False
         p_title = st.text_input("大标题（留空则 AI 写 / 用主题）", key="p_title",
-                                placeholder="例如：3 个被低估的赚钱小工具",
-                                value=st.session_state.get("ai_title", ""))
-        p_sub = st.text_input("小标签（可选，如：信息差·副业）", key="p_sub",
-                               value=st.session_state.get("ai_sub", ""))
-        p_tags = st.text_input("标签（用逗号分隔，可选）", key="p_tags", placeholder="副业,AI工具,信息差",
-                                value=st.session_state.get("ai_tags", ""))
+                                placeholder="例如：3 个被低估的赚钱小工具")
+        p_sub = st.text_input("小标签（可选，如：信息差·副业）", key="p_sub")
+        p_tags = st.text_input("标签（用逗号分隔，可选）", key="p_tags", placeholder="副业,AI工具,信息差")
         p_footer = st.text_input("底部署名（可选，如：by 小工具站）", key="p_footer")
+        # 若 AI 已生成文案，给出明确提示，让用户知道内容已填入
+        if st.session_state.get("ai_title"):
+            st.success("✅ AI 已为你写好文案，已自动填入上方输入框，可直接修改后点「生成配图」。")
         st.markdown('</div>', unsafe_allow_html=True)
 
     # AI 写文案（可选）
@@ -440,6 +446,8 @@ if st.session_state["active_tool"] == "poster":
                         st.session_state["ai_title"] = cp.get("title", p_topic)
                         st.session_state["ai_sub"] = cp.get("subtitle", "")
                         st.session_state["ai_tags"] = ",".join(cp.get("tags", []))
+                        # 标记需要把 AI 文案同步进输入框（在 widget 实例化之前执行一次）
+                        st.session_state["ai_synced"] = True
                         st.rerun()
                     except Exception as e:
                         st.error(f"AI 文案失败：{e}")

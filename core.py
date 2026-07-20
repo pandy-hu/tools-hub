@@ -358,6 +358,19 @@ POSTER_THEMES = {
                "text": "#FFFFFF", "sub": "#FCE7F3", "deco": "rgba(255,255,255,0.18)"},
     "高级紫": {"bg": "linear-gradient(135deg,#4C1D95 0%,#7C3AED 100%)", "accent": "#EDE9FE",
                "text": "#FFFFFF", "sub": "#DDD6FE", "deco": "rgba(255,255,255,0.12)"},
+    # ===== 第二批模板（共 12 套）=====
+    "科技青": {"bg": "linear-gradient(135deg,#0F766E 0%,#06B6D4 100%)", "accent": "#A7F3D0",
+               "text": "#FFFFFF", "sub": "#CCFBF1", "deco": "rgba(255,255,255,0.12)"},
+    "暖阳橙金": {"bg": "linear-gradient(135deg,#B45309 0%,#F59E0B 100%)", "accent": "#FEF3C7",
+                 "text": "#FFFFFF", "sub": "#FDE68A", "deco": "rgba(255,255,255,0.14)"},
+    "莫兰迪灰": {"bg": "linear-gradient(135deg,#374151 0%,#9CA3AF 100%)", "accent": "#F3F4F6",
+                 "text": "#FFFFFF", "sub": "#E5E7EB", "deco": "rgba(255,255,255,0.10)"},
+    "赛博粉": {"bg": "linear-gradient(135deg,#831843 0%,#DB2777 100%)", "accent": "#FBCFE8",
+               "text": "#FFFFFF", "sub": "#FCE7F3", "deco": "rgba(255,255,255,0.14)"},
+    "深海蓝": {"bg": "linear-gradient(135deg,#0C4A6E 0%,#0369A1 100%)", "accent": "#BAE6FD",
+               "text": "#FFFFFF", "sub": "#E0F2FE", "deco": "rgba(255,255,255,0.12)"},
+    "咖啡棕": {"bg": "linear-gradient(135deg,#451A03 0%,#92400E 100%)", "accent": "#FED7AA",
+               "text": "#FFFFFF", "sub": "#FFEDD5", "deco": "rgba(255,255,255,0.10)"},
 }
 
 POSTER_SIZES = {
@@ -365,6 +378,7 @@ POSTER_SIZES = {
     "公众号封面 2.35:1": (900, 383),
     "YouTube缩略图 16:9": (1280, 720),
     "朋友圈方图 1:1": (1080, 1080),
+    "抖音·视频号 9:16": (1080, 1920),
 }
 
 
