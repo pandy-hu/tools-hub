@@ -3,3 +3,4 @@ pdfplumber
 openpyxl
 pandas
 requests
+plotly

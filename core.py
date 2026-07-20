@@ -218,3 +218,76 @@ def visa_regions():
 def visa_policies():
     return ["全部", "免签", "免签/落地签", "落地签", "落地签/电子签", "电子签",
             "电子旅行授权", "电子签/持美签免签", "需提前办理"]
+
+
+# ===================== 数据可视化 =====================
+def viz_load_data(raw_bytes, filename):
+    """从上传的 CSV/Excel 字节加载为 DataFrame。"""
+    name = (filename or "").lower()
+    if name.endswith((".xlsx", ".xls")):
+        return pd.read_excel(io.BytesIO(raw_bytes))
+    last_err = None
+    for enc in ("utf-8-sig", "utf-8", "gbk", "gb18030", "latin-1"):
+        try:
+            return pd.read_csv(io.BytesIO(raw_bytes), encoding=enc)
+        except Exception as e:
+            last_err = e
+    raise ValueError(f"无法解析该文件（试试 UTF-8 或 GBK 编码的 CSV）：{last_err}")
+
+
+def viz_is_numeric(series):
+    """判断某列是否可当作数值（原生数值，或多数能转数值）。"""
+    if pd.api.types.is_numeric_dtype(series):
+        return True
+    return pd.to_numeric(series, errors="coerce").notna().mean() > 0.5
+
+
+def viz_make_figure(df, chart_type, x_col, y_cols, title="", agg="不聚合", top_n=0):
+    """返回 plotly.graph_objects.Figure。
+
+    chart_type: 柱状图 / 折线图 / 饼图 / 散点图
+    agg: 不聚合 / 求和 / 平均 / 计数（x 为分类列、y 为数值列时生效）
+    top_n: >0 时按 y 第一列取前 N 行（绘图前排序）
+    """
+    import plotly.graph_objects as go
+    work = df.copy()
+    if agg != "不聚合" and x_col and y_cols:
+        try:
+            if agg == "求和":
+                work = work.groupby(x_col, as_index=False)[y_cols].sum(numeric_only=True)
+            elif agg == "平均":
+                work = work.groupby(x_col, as_index=False)[y_cols].mean(numeric_only=True)
+            elif agg == "计数":
+                work = work.groupby(x_col, as_index=False)[y_cols].count()
+        except Exception:
+            pass
+    if top_n and top_n > 0 and y_cols:
+        y0 = y_cols[0]
+        try:
+            work = work.sort_values(y0, ascending=False).head(top_n)
+        except Exception:
+            pass
+
+    fig = go.Figure()
+    if chart_type == "柱状图":
+        for y in y_cols:
+            fig.add_bar(name=str(y), x=work[x_col], y=work[y])
+        fig.update_layout(barmode="group")
+    elif chart_type == "折线图":
+        for y in y_cols:
+            fig.add_trace(go.Scatter(x=work[x_col], y=work[y], mode="lines+markers", name=str(y)))
+    elif chart_type == "饼图":
+        y = y_cols[0] if y_cols else None
+        fig.add_trace(go.Pie(labels=work[x_col], values=work[y], textinfo="label+percent"))
+    elif chart_type == "散点图":
+        y = y_cols[0] if y_cols else None
+        if y:
+            fig.add_trace(go.Scatter(x=work[x_col], y=work[y], mode="markers", name=str(y)))
+    fig.update_layout(
+        title=title or "数据可视化",
+        template="plotly_white",
+        font=dict(family="Microsoft YaHei, PingFang SC, sans-serif", size=13),
+        margin=dict(l=40, r=20, t=50, b=40),
+        legend=dict(orientation="h", y=-0.2),
+    )
+    return fig

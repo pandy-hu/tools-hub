@@ -7,9 +7,10 @@ from core import (
     pdf_extract_tables, pdf_tables_to_excel,
     formula_generate, resume_generate, PRESETS,
     visa_search, visa_regions, visa_policies,
+    viz_load_data, viz_is_numeric, viz_make_figure,
 )
 
-st.set_page_config(page_title="小工具站 · 三个能赚钱的小工具", page_icon="🧰", layout="centered")
+st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
 
 
 def get_cloud_key(provider):
@@ -44,7 +45,7 @@ div.stButton > button {{ background:{PRIMARY}; color:#fff; font-weight:700; bord
 st.markdown('<div class="big-title">🧰 小工具站</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub">一组对标海外成功案例的小工具（含中国护照信息差版），免费可用。上方切换。</div>', unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 PDF", "📊 公式", "📋 简历", "🛂 签证", "💡 关于"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📄 PDF", "📊 公式", "📋 简历", "🛂 签证", "📈 数据", "💡 关于"])
 
 # ---------------- Tab 1: PDF 转 Excel ----------------
 with tab1:
@@ -237,8 +238,77 @@ with tab4:
                 st.markdown(f"- {r}")
             st.markdown(f"🔗 官方参考：[{c.get('official','')}]({c.get('official','')})")
 
-# ---------------- Tab 5: 关于 / 升级 ----------------
+# ---------------- Tab 5: 数据可视化 ----------------
 with tab5:
+    import io as _io
+    st.markdown("### 📈 数据可视化小工具")
+    st.caption("上传 CSV / Excel，自动识别字段，选个图表类型就出图。纯本地处理，数据不上传服务器。对标海外 $10K/月案例。")
+    with st.container():
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        v_file = st.file_uploader("拖入或点击上传 数据文件（.csv / .xlsx）", type=["csv", "xlsx", "xls"], key="viz_up")
+        st.markdown('</div>', unsafe_allow_html=True)
+    if v_file is not None:
+        try:
+            v_df = viz_load_data(v_file.read(), v_file.name)
+        except Exception as e:
+            st.error(f"读取失败：{e}")
+            v_df = None
+        if v_df is not None:
+            cols = list(v_df.columns)
+            num_cols = [c for c in cols if viz_is_numeric(v_df[c])]
+            st.success(f"✅ 已加载 {len(v_df)} 行 × {len(cols)} 列")
+            with st.expander("🔍 数据预览（前 20 行）"):
+                st.dataframe(v_df.head(20), use_container_width=True, height=300)
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+            v_type = st.selectbox("图表类型", ["柱状图", "折线图", "饼图", "散点图"], key="viz_type")
+            vx, vy = st.columns(2)
+            with vx:
+                v_x = st.selectbox("X 轴 / 名称列", cols, key="viz_x")
+            with vy:
+                if v_type == "饼图" or v_type == "散点图":
+                    v_y = st.selectbox("数值列（Y）", num_cols or cols, key="viz_y")
+                    v_y_cols = [v_y]
+                else:
+                    v_y_cols = st.multiselect("数值列（Y，可多选）", num_cols or cols,
+                                              default=(num_cols[:1] if num_cols else cols[:1]), key="viz_ys")
+            v_title = st.text_input("图表标题（可选）", key="viz_title", placeholder="例如：2025 各月销售额")
+            if v_type in ("柱状图", "折线图", "饼图"):
+                v_agg = st.selectbox("聚合方式（X 为分类列时）", ["不聚合", "求和", "平均", "计数"], key="viz_agg")
+            else:
+                v_agg = "不聚合"
+            v_top = st.number_input("只取前 N 行（0 = 全部）", min_value=0, max_value=100, value=0, step=1, key="viz_top")
+            st.markdown('</div>', unsafe_allow_html=True)
+            if st.button("🚀 生成图表", use_container_width=True, key="viz_go"):
+                if not v_y_cols:
+                    st.warning("请至少选一个数值列～")
+                else:
+                    with st.spinner("绘制中…"):
+                        try:
+                            fig = viz_make_figure(v_df, v_type, v_x, v_y_cols, v_title, v_agg, int(v_top))
+                            st.plotly_chart(fig, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"出图失败：{e}")
+            # 下载：图表 PNG（best-effort）+ 数据 Excel
+            try:
+                import plotly.graph_objects as _go
+                _fig = viz_make_figure(v_df, v_type, v_x, v_y_cols, v_title, v_agg, int(v_top))
+                _buf = _io.BytesIO()
+                _fig.write_image(_buf, format="png", width=900, height=520, scale=2)
+                st.download_button("⬇️ 下载图表 PNG", data=_buf.getvalue(),
+                                   file_name=v_file.name.rsplit(".", 1)[0] + "_图表.png", mime="image/png")
+            except Exception:
+                st.caption("（PNG 导出需 kaleido，未安装则跳过；可改下方式下载数据）")
+            try:
+                _xb = _io.BytesIO()
+                v_df.to_excel(_xb, index=False)
+                st.download_button("⬇️ 下载数据 (Excel)", data=_xb.getvalue(),
+                                   file_name=v_file.name.rsplit(".", 1)[0] + "_数据.xlsx",
+                                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            except Exception:
+                pass
+
+# ---------------- Tab 6: 关于 / 升级 ----------------
+with tab6:
     st.markdown("### 💡 关于这个小工具站")
     st.markdown("""
     这是一组**对标海外成功案例**的小工具（灵感来自 StarterStory）：
@@ -246,8 +316,10 @@ with tab5:
     - 📄 **PDF 转 Excel** —— 对标海外 $40K/月案例
     - 📊 **Excel 公式机器人** —— 对标海外 $20K/月案例
     - 📋 **中文 AI 简历生成器** —— 对标 Rezi $215K/月（中文差异化版）
+    - 🛂 **中国护照签证政策聚合** —— 对标海外 $20K/月案例（信息差版）
+    - 📈 **数据可视化小工具** —— 对标海外 $10K/月案例
 
-    全部免费可用。PDF 工具本地运行、无需 Key；另外两个填 Key 即联网、不填也能看演示。
+    全部免费可用。PDF / 签证 / 数据 工具本地运行、无需 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)
     upgrade_url = st.secrets.get("UPGRADE_URL", "")
     st.markdown("### 🔓 升级高级版")
@@ -275,4 +347,4 @@ with tab5:
     else:
         st.info("若想开通赞助收款：在部署平台 Secrets 配置 `SPONSOR_URL`（你的收款页链接，如爱发电 / 奶茶）"
                  "与 `SPONSOR_TEXT`（按钮文案）、`SPONSOR_ICON`（图标 emoji），本页会自动出现赞助按钮。")
-    st.markdown('<div class="foot">MVP · 由 WorkBuddy 生成 · 三个工具合成一站</div>', unsafe_allow_html=True)
+    st.markdown('<div class="foot">MVP · 由 WorkBuddy 生成 · 多个工具合成一站</div>', unsafe_allow_html=True)
