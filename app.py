@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""小工具站: PDF转Excel / Excel公式机器人 / AI简历生成器 / 签证政策聚合 / 数据可视化 / Airtable导入。
+"""小工具站: PDF转Excel / Excel公式机器人 / AI简历生成器 / 签证政策聚合 / 数据可视化 / Airtable导入 / AI配图生成器。
 对标 StarterStory 成功案例, 可一键部署到 Streamlit Cloud 获得公开网址。"""
 import pandas as pd
 import streamlit as st
@@ -9,6 +9,8 @@ from core import (
     visa_search, visa_regions, visa_policies,
     viz_load_data, viz_is_numeric, viz_make_figure,
     airtable_list_tables, airtable_import,
+    poster_themes, poster_sizes, generate_poster_html, poster_preview_html,
+    poster_copy, PRESETS,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -46,7 +48,7 @@ div.stButton > button {{ background:{PRIMARY}; color:#fff; font-weight:700; bord
 st.markdown('<div class="big-title">🧰 小工具站</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub">一组对标海外成功案例的小工具（含中国护照信息差版），免费可用。上方切换。</div>', unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📄 PDF", "📊 公式", "📋 简历", "🛂 签证", "📈 数据", "🗄️ 导入", "💡 关于"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["📄 PDF", "📊 公式", "📋 简历", "🛂 签证", "📈 数据", "🗄️ 导入", "🎨 配图", "💡 关于"])
 
 # ---------------- Tab 1: PDF 转 Excel ----------------
 with tab1:
@@ -373,6 +375,67 @@ with tab6:
                                 for e in res["errors"][:5]:
                                     st.caption(e)
 
+# ---------------- Tab 8: AI 配图 / 海报生成器 ----------------
+with tab8:
+    st.markdown("### 🎨 AI 配图 / 海报生成器")
+    st.caption("输入主题，选模板和尺寸，一键生成社媒配图（小红书 / 公众号 / YouTube / 朋友圈）。纯本地生成，免 Key；填 Key 还能让 AI 帮你写文案。")
+    with st.container():
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        p_topic = st.text_input("🎯 内容主题（如：普通人如何用 AI 搞副业）", key="p_topic",
+                                placeholder="输入你想做配图的主题")
+        pa, pb = st.columns(2)
+        with pa:
+            p_theme = st.selectbox("配色模板", poster_themes(), key="p_theme")
+        with pb:
+            p_size = st.selectbox("尺寸 / 平台", poster_sizes(), key="p_size")
+        p_title = st.text_input("大标题（留空则 AI 写 / 用主题）", key="p_title",
+                                placeholder="例如：3 个被低估的赚钱小工具")
+        p_sub = st.text_input("小标签（可选，如：信息差·副业）", key="p_sub")
+        p_tags = st.text_input("标签（用逗号分隔，可选）", key="p_tags", placeholder="副业,AI工具,信息差")
+        p_footer = st.text_input("底部署名（可选，如：by 小工具站）", key="p_footer")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # AI 写文案（可选）
+    with st.expander("✨ 让 AI 帮我写文案（可选，填 Key 联网）"):
+        p_provider = st.selectbox("选择大模型", list(PRESETS.keys()), index=0, key="p_provider")
+        p_cloud_key = get_cloud_key(p_provider)
+        p_key = st.text_input("API Key（留空则用自己的标题）", type="password", value=p_cloud_key, key="p_key")
+        if p_cloud_key:
+            st.success("✅ 已检测到云端密钥，可直接联网写文案")
+        pu, pm = st.columns(2)
+        with pu:
+            p_url = st.text_input("API Base URL", value=PRESETS[p_provider]["base_url"], key="p_url")
+        with pm:
+            p_model = st.text_input("模型名", value=PRESETS[p_provider]["model"], key="p_model")
+        if st.button("🤖 AI 生成文案", key="p_ai", use_container_width=True):
+            if not p_topic.strip():
+                st.warning("先填一下内容主题～")
+            else:
+                with st.spinner("AI 写文案中…"):
+                    try:
+                        cp = poster_copy(p_topic, p_key, p_url, p_model,
+                                         mock=(not p_key.strip()) or (not p_url.strip()))
+                        st.session_state["p_title"] = cp.get("title", p_topic)
+                        st.session_state["p_sub"] = cp.get("subtitle", "")
+                        st.session_state["p_tags"] = "，".join(cp.get("tags", []))
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"AI 文案失败：{e}")
+
+    if st.button("🚀 生成配图", use_container_width=True, key="p_go"):
+        title = (p_title or p_topic or "我的配图").strip()
+        sub = p_sub.strip()
+        tags = [t.strip() for t in p_tags.split(",") if t.strip()] if p_tags else []
+        footer = p_footer.strip()
+        poster = generate_poster_html(title, sub, p_theme, p_size, footer, tags)
+        # 取真实尺寸用于预览缩放
+        from core import POSTER_SIZES as _PS
+        _w, _h = _PS[p_size]
+        st.markdown(poster_preview_html(poster, _w, _h), unsafe_allow_html=True)
+        st.success("✅ 配图已生成！下方下载 HTML，用浏览器打开即可截图 / 打印成图片。")
+        st.download_button("⬇️ 下载配图 HTML", data=poster, file_name="我的配图.html", mime="text/html")
+        st.caption("提示：下载后用浏览器打开，右键图片区域 → 截图，或按 Ctrl+P 打印成 PDF/PNG，即得高清配图。")
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 with tab7:
     st.markdown("### 💡 关于这个小工具站")
@@ -385,6 +448,7 @@ with tab7:
     - 🛂 **中国护照签证政策聚合** —— 对标海外 $20K/月案例（信息差版）
     - 📈 **数据可视化小工具** —— 对标海外 $10K/月案例
     - 🗄️ **CSV → Airtable 导入** —— 对标海外 $20K/月案例（你带自己的 Token）
+    - 🎨 **AI 配图 / 海报生成器** —— 对标社媒配图类小工具（$5K-20K/月，本地生成免 Key）
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)

@@ -342,3 +342,116 @@ def airtable_import(token, base_id, table_name, records, dry_run=False, batch=10
             errors.append(f"批次 {i // batch + 1}: {e}")
         time.sleep(0.25)  # 尊重 Airtable 限速（5 次/秒）
     return {"success": ok, "failed": failed, "errors": errors}
+
+
+# ===================== AI 配图 / 海报生成器 =====================
+POSTER_THEMES = {
+    "商务蓝": {"bg": "linear-gradient(135deg,#1E3A8A 0%,#2D6CDF 100%)", "accent": "#7CFC9B",
+               "text": "#FFFFFF", "sub": "#D6E2FF", "deco": "rgba(255,255,255,0.12)"},
+    "活力橙": {"bg": "linear-gradient(135deg,#FF6A00 0%,#FFB347 100%)", "accent": "#FFF3E0",
+               "text": "#FFFFFF", "sub": "#FFE9CC", "deco": "rgba(255,255,255,0.16)"},
+    "极简黑": {"bg": "linear-gradient(135deg,#111827 0%,#1F2937 100%)", "accent": "#FBBF24",
+               "text": "#FFFFFF", "sub": "#9CA3AF", "deco": "rgba(255,255,255,0.10)"},
+    "清新绿": {"bg": "linear-gradient(135deg,#065F46 0%,#10B981 100%)", "accent": "#D1FAE5",
+               "text": "#FFFFFF", "sub": "#CFFAF0", "deco": "rgba(255,255,255,0.14)"},
+    "少女粉": {"bg": "linear-gradient(135deg,#DB2777 0%,#F9A8D4 100%)", "accent": "#FFF0F6",
+               "text": "#FFFFFF", "sub": "#FCE7F3", "deco": "rgba(255,255,255,0.18)"},
+    "高级紫": {"bg": "linear-gradient(135deg,#4C1D95 0%,#7C3AED 100%)", "accent": "#EDE9FE",
+               "text": "#FFFFFF", "sub": "#DDD6FE", "deco": "rgba(255,255,255,0.12)"},
+}
+
+POSTER_SIZES = {
+    "小红书 3:4": (1080, 1350),
+    "公众号封面 2.35:1": (900, 383),
+    "YouTube缩略图 16:9": (1280, 720),
+    "朋友圈方图 1:1": (1080, 1080),
+}
+
+
+def poster_themes():
+    return list(POSTER_THEMES.keys())
+
+
+def poster_sizes():
+    return list(POSTER_SIZES.keys())
+
+
+def generate_poster_html(title, subtitle, theme, size, footer, tags):
+    """生成一张可直接在浏览器渲染的配图 HTML（中文用系统字体，无需字体文件）。"""
+    th = POSTER_THEMES.get(theme, POSTER_THEMES["商务蓝"])
+    w, h = POSTER_SIZES.get(size, (1080, 1350))
+    font_stack = '"PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif'
+
+    tag_html = ""
+    if tags:
+        pills = "".join(
+            f'<span style="display:inline-block;background:{th["accent"]};color:#111827;'
+            f'font-weight:800;padding:8px 18px;border-radius:999px;margin:5px;'
+            f'font-size:{int(h*0.03)}px;font-family:{font_stack};">#{t}</span>'
+            for t in tags
+        )
+        tag_html = f'<div style="margin-top:{int(h*0.05)}px;">{pills}</div>'
+
+    footer_html = ""
+    if footer:
+        footer_html = (
+            f'<div style="position:absolute;bottom:{int(h*0.055)}px;left:0;right:0;'
+            f'text-align:center;color:{th["sub"]};font-size:{int(h*0.032)}px;'
+            f'font-family:{font_stack};letter-spacing:1px;">{footer}</div>'
+        )
+
+    sub_html = ""
+    if subtitle:
+        sub_html = (
+            f'<div style="color:{th["accent"]};font-weight:800;'
+            f'font-size:{int(h*0.05)}px;letter-spacing:3px;margin-bottom:{int(h*0.035)}px;'
+            f'font-family:{font_stack};">{subtitle}</div>'
+        )
+
+    html = f'''<div style="position:relative;width:{w}px;height:{h}px;background:{th["bg"]};overflow:hidden;font-family:{font_stack};">
+  <div style="position:absolute;top:-{int(w*0.25)}px;right:-{int(w*0.2)}px;width:{int(w*0.7)}px;height:{int(w*0.7)}px;border-radius:50%;background:{th["deco"]};"></div>
+  <div style="position:absolute;bottom:-{int(w*0.18)}px;left:-{int(w*0.15)}px;width:{int(w*0.55)}px;height:{int(w*0.55)}px;border-radius:50%;background:{th["deco"]};"></div>
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:{int(w*0.1)}px;text-align:center;box-sizing:border-box;">
+    {sub_html}
+    <div style="color:{th["text"]};font-weight:900;font-size:{int(h*0.09)}px;line-height:1.18;font-family:{font_stack};">{title}</div>
+    {tag_html}
+  </div>
+  {footer_html}
+</div>'''
+    return html
+
+
+def poster_preview_html(poster_html, w, h, max_w=480):
+    """把整张海报按比例缩小放进预览框，保持原比例。"""
+    scale = round(max_w / w, 4)
+    return (
+        f'<div style="width:{int(w*scale)}px;height:{int(h*scale)}px;overflow:hidden;'
+        f'margin:0 auto;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,0.12);">'
+        f'<div style="transform:scale({scale});transform-origin:top left;width:{w}px;height:{h}px;">'
+        f'{poster_html}</div></div>'
+    )
+
+
+POSTER_MOCK = {
+    "title": "3 个被低估的赚钱小工具",
+    "subtitle": "信息差 · 普通人也能上手",
+    "tags": ["副业", "AI工具", "信息差"],
+}
+
+POSTER_SYSTEM = """你是一个社媒配图文案专家，擅长写抓眼球的中文标题。
+用户会给他想做的内容主题。请只返回一个 JSON 对象，不要包含多余文字或 markdown 标记。
+JSON 结构：
+{
+  "title": "一句抓眼球的标题（12-20字，用换行符\\n分成1-2行更醒目）",
+  "subtitle": "一行小字标签（如 信息差·副业 这类，8字内）",
+  "tags": ["标签1","标签2","标签3"]
+}
+要求：全部简体中文，标题要有钩子感（数字/反差/痛点），避免空话。"""
+
+
+def poster_copy(topic, api_key, base_url, model, mock=False):
+    """调用大模型为配图生成文案。缺 Key 或 mock 时返回演示文案。"""
+    if mock or not api_key or not base_url:
+        return POSTER_MOCK
+    user_msg = f"内容主题：{topic}\n请为它写一张社媒配图的标题与标签。"
+    return _call_llm(POSTER_SYSTEM, user_msg, api_key, base_url, model)
