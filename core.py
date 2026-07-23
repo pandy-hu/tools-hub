@@ -4,6 +4,9 @@
 import io
 import json
 import time
+import os
+import tempfile
+import asyncio
 import pandas as pd
 import pdfplumber
 import requests
@@ -21,6 +24,12 @@ try:
     _QR_AVAILABLE = True
 except Exception:
     _QR_AVAILABLE = False
+
+try:
+    import edge_tts
+    _TTS_AVAILABLE = True
+except Exception:
+    _TTS_AVAILABLE = False
 
 # ===================== PDF 转 Excel =====================
 def pdf_extract_tables(pdf_bytes):
@@ -645,3 +654,51 @@ def qr_generate(text, *, box_size=10, border=4, error_correction="M",
     out = io.BytesIO()
     img.save(out, format="PNG")
     return out.getvalue(), img.size[0]
+
+
+# ===================== 文字转语音 TTS =====================
+TTS_VOICES = {
+    "晓晓（女·甜美）": "zh-CN-XiaoxiaoNeural",
+    "云希（男·沉稳）": "zh-CN-YunxiNeural",
+    "云剑（男·专业）": "zh-CN-YunjianNeural",
+    "晓伊（女·温柔）": "zh-CN-XiaoyiNeural",
+    "云夏（男·活力）": "zh-CN-YunxiaNeural",
+    "晓睿（女·活泼）": "zh-CN-XiaoruiNeural",
+    "云扬（男·新闻）": "zh-CN-YunyangNeural",
+}
+
+
+def tts_voices():
+    """返回可选音色的中文标签列表。"""
+    return list(TTS_VOICES.keys())
+
+
+def tts_generate(text, voice_label="晓晓（女·甜美）", rate="+0%", pitch="+0Hz"):
+    """调用微软免费 TTS（免 Key）生成语音，返回 MP3 字节流。
+
+    rate: 语速，如 +20% / -10%；pitch: 音调，如 +10Hz / -5Hz。
+    """
+    if not _TTS_AVAILABLE:
+        raise EnvironmentError("文字转语音需要 edge-tts，请确认 requirements.txt 中包含 edge-tts")
+    if not text or not text.strip():
+        raise ValueError("文字内容不能为空")
+
+    short = TTS_VOICES.get(voice_label, "zh-CN-XiaoxiaoNeural")
+    tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    tmp.close()
+    try:
+        communicate = edge_tts.Communicate(text.strip(), short, rate=rate, pitch=pitch)
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(communicate.save(tmp.name))
+        finally:
+            loop.close()
+        with open(tmp.name, "rb") as f:
+            data = f.read()
+        return data
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except Exception:
+            pass

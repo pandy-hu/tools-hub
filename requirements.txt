@@ -6,3 +6,4 @@ requests
 plotly
 Pillow
 qrcode
+edge-tts

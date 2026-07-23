@@ -13,6 +13,7 @@ from core import (
     poster_copy, PRESETS,
     image_process, image_tool_formats,
     qr_generate,
+    tts_generate, tts_voices,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -54,7 +55,8 @@ st.markdown('<div class="sub">一组对标海外成功案例的小工具（含�
 TOOLS = [
     ("📄 PDF", "pdf"), ("📊 公式", "formula"), ("📋 简历", "resume"),
     ("🛂 签证", "visa"), ("📈 数据", "data"), ("🗄️ 导入", "airtable"),
-    ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("🔳 二维码", "qr"), ("💡 关于", "about"),
+    ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("🔳 二维码", "qr"),
+    ("🔊 语音", "tts"), ("💡 关于", "about"),
 ]
 PER_ROW = 6
 if "active_tool" not in st.session_state:
@@ -553,6 +555,35 @@ if st.session_state["active_tool"] == "qr":
                 except Exception as e:
                     st.error(f"生成失败：{e}")
 
+# ---------------- Tab 10: 文字转语音 TTS ----------------
+if st.session_state["active_tool"] == "tts":
+    st.markdown("### 🔊 文字转语音")
+    st.markdown("输入文字，一键生成中文语音 MP3。基于微软免费接口，**免 API Key**，联网即可用。")
+    tts_text = st.text_area("要转为语音的文字", key="tts_text", height=160,
+                            placeholder="例如：欢迎来到小工具站，这里有 10 款能帮你赚钱的小工具。")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        tts_voice = st.selectbox("音色", tts_voices(), index=0, key="tts_voice")
+    with c2:
+        tts_rate = st.selectbox("语速", ["-20%", "-10%", "+0%", "+10%", "+20%", "+30%"],
+                                index=2, key="tts_rate")
+    with c3:
+        tts_pitch = st.selectbox("音调", ["-10Hz", "-5Hz", "+0Hz", "+5Hz", "+10Hz"],
+                                 index=2, key="tts_pitch")
+
+    if st.button("🚀 生成语音", use_container_width=True, key="tts_go"):
+        if not tts_text.strip():
+            st.warning("先填一下要转语音的文字～")
+        else:
+            with st.spinner("生成中（需联网调用微软接口）…"):
+                try:
+                    mp3 = tts_generate(tts_text, tts_voice, rate=tts_rate, pitch=tts_pitch)
+                    st.audio(mp3, format="audio/mp3")
+                    st.download_button("⬇️ 下载 MP3", data=mp3, file_name="speech.mp3",
+                                       mime="audio/mpeg", use_container_width=True)
+                except Exception as e:
+                    st.error(f"生成失败：{e}")
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
@@ -568,6 +599,7 @@ if st.session_state["active_tool"] == "about":
     - 🎨 **AI 配图 / 海报生成器** —— 对标社媒配图类小工具（$5K-20K/月，本地生成免 Key）
     - 🖼️ **图片处理工具箱** —— 对标海外图片压缩类小工具（$5K-20K/月，本地免 Key）
     - 🔳 **二维码生成器** —— 对标海外引流/营销类小工具（本地免 Key）
+    - 🔊 **文字转语音 TTS** —— 基于微软免费接口，免 Key 生成中文语音 MP3
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)
