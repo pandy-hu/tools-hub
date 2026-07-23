@@ -47,6 +47,13 @@ st.markdown(f"""
 .box {{ background:#fff; border:1px solid #e3ebfb; border-radius:10px; padding:12px 14px; }}
 .foot {{ color:#9aa7bd; font-size:12px; margin-top:24px; text-align:center; }}
 div.stButton > button {{ background:{PRIMARY}; color:#fff; font-weight:700; border-radius:10px; padding:10px 22px; white-space:nowrap; }}
+/* 🔒 安全：隐藏所有密码框的“小眼睛”，并禁止选中/复制 API Key（只可粘贴进去） */
+div[data-testid="stTextInput"] button {{ display: none !important; }}
+input[type="password"] {{
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  user-select: none !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
