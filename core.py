@@ -738,6 +738,66 @@ def tts_generate(text, voice_label="晓晓（女·甜美）", rate="+0%", pitch=
             pass
 
 
+# ===================== 多平台文案改写 (一稿多发) =====================
+REWRITE_PLATFORMS = ["小红书", "公众号", "抖音/视频号", "微博", "知乎"]
+
+
+def rewrite_platforms():
+    """返回可选的目标平台列表。"""
+    return REWRITE_PLATFORMS
+
+
+REWRITE_SYSTEM = """你是一个资深的新媒体多平台文案改写专家。
+当用户给出一段原始文案和一个目标平台时，请把文案改写成该平台最合适的风格与格式。
+
+各平台风格要点：
+- 小红书：大量 emoji、口语化、第一人称种草、分段清晰、结尾加 3-5 个 #话题标签（如 #副业 #信息差 #小工具）、带互动引导（如"评论区告诉我"）
+- 公众号：标题有吸引力但不浮夸、开篇抛观点/痛点、结构清晰有小标题、语气专业可信、适合 300-800 字
+- 抖音/视频号：强钩子开头（前 3 秒抓人）、短句为主、口语化带节奏感、适合口播、可加 2-3 个 emoji
+- 微博：短平快、140 字内最佳、带话题 #、有互动感（提问/投票）
+- 知乎：理性专业、有逻辑层次、可引用数据或案例、结尾可引导关注，语气克制
+
+只返回改写后的文案正文，不要包含任何解释或 markdown 代码块标记。"""
+
+
+REWRITE_MOCK = {
+    "小红书": "✨姐妹们！今天挖到一个超好用的小工具站🔧\n\n里面整整 12 款工具，从 PDF 转 Excel 到 AI 配图、二维码、文字转语音全都有，关键还全免费！\n\n我自己的使用感受：界面清爽、不卡顿，上传文件本地处理很安心🛡️\n\n#副业 #信息差 #小工具推荐 #效率神器 #AI工具",
+    "公众号": "你缺的不是一个工具，而是一套能赚钱的小工具组合。\n\n今天想认真安利一个我最近在用的「小工具站」——12 款实用工具聚合在一起，覆盖 PDF 处理、Excel 公式、AI 简历、配图、二维码、语音等场景。\n\n为什么值得用？\n1. 全免费，打开就能用\n2. 本地处理，数据不上传\n3. 对标海外成功案例，功能经过验证\n\n如果你也在做副业或内容创作，建议收藏。",
+    "抖音/视频号": "🔥别再到处找工具了！这一个网站全搞定！\n\n12 款神器，PDF 转 Excel、AI 写简历、一键配图、语音生成…全免费！\n\n而且本地处理，隐私不怕泄露！\n\n赶紧收藏，错过真的亏！",
+    "微博": "挖到一个免费小工具站，12 款实用工具聚合，PDF/Excel/配图/二维码/语音全有，本地处理很安心。做副业和内容创作的值得收藏👉 #效率工具 #副业 #信息差",
+    "知乎": "如何看待「小工具聚合站」这种低成本创业形态？\n\n近期体验了一款聚合 12 款实用工具的小工具站，谈几点观察：\n\n1. 模式上，它把海外验证过的单点工具（如 PDF 处理、AI 简历）打包成一站，降低用户决策成本；\n2. 隐私上采用本地处理，符合国内用户对数据安全的诉求；\n3. 变现路径清晰——免费引流，增值服务转化。\n\n这类「轻资产、强需求」的产品，值得关注。",
+}
+
+
+def _call_llm_text(system_prompt, user_msg, api_key, base_url, model):
+    """调用大模型返回纯文本（非 JSON）。用于文案改写等自由文本场景。"""
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0.7,
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    r = requests.post(base_url.rstrip("/") + "/chat/completions",
+                      headers=headers, json=payload, timeout=30)
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"].strip()
+
+
+def rewrite_copy(text, platform, api_key, base_url, model, mock=False):
+    """按目标平台风格改写文案。缺 Key 或 mock 时返回演示改写。"""
+    platform = platform or "小红书"
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("请先输入要改写的原始文案")
+    if mock or not api_key or not base_url:
+        return REWRITE_MOCK.get(platform, text)
+    user_msg = f"目标平台：{platform}\n原始文案：\n{text}"
+    return _call_llm_text(REWRITE_SYSTEM, user_msg, api_key, base_url, model)
+
+
 # ===================== PDF 合并 / 加水印 =====================
 def pdf_merge(pdf_list):
     """合并多个 PDF 字节流，返回 (合并后字节, 页数)。pdf_list: [(文件名, 字节)]。"""

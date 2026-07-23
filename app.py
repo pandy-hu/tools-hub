@@ -15,6 +15,7 @@ from core import (
     qr_generate,
     tts_generate, tts_voices,
     pdf_merge, pdf_add_watermark, pdf_page_count,
+    rewrite_platforms, rewrite_copy,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -57,7 +58,8 @@ TOOLS = [
     ("📄 PDF", "pdf"), ("📊 公式", "formula"), ("📋 简历", "resume"),
     ("🛂 签证", "visa"), ("📈 数据", "data"), ("🗄️ 导入", "airtable"),
     ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("🔳 二维码", "qr"),
-    ("🔊 语音", "tts"), ("📑 合并", "pdfmerge"), ("💡 关于", "about"),
+    ("🔊 语音", "tts"), ("📑 合并", "pdfmerge"), ("✍️ 改写", "rewrite"),
+    ("💡 关于", "about"),
 ]
 PER_ROW = 6
 if "active_tool" not in st.session_state:
@@ -635,6 +637,47 @@ if st.session_state["active_tool"] == "pdfmerge":
         else:
             st.info("👆 先上传 1 个 PDF")
 
+# ---------------- Tab 12: 多平台文案改写 (一稿多发) ----------------
+if st.session_state["active_tool"] == "rewrite":
+    st.markdown("### ✍️ 多平台文案改写（一稿多发）")
+    st.caption("输入一段文案，一键改写成小红书 / 公众号 / 抖音 / 微博 / 知乎风格，方便一稿多发引流。填 Key 联网改写，不填则演示。")
+    with st.container():
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        w_provider = st.selectbox("选择大模型", list(PRESETS.keys()), index=0, key="w_provider")
+        w_cloud_key = get_cloud_key(w_provider)
+        w_key = st.text_input("API Key（留空则演示模式）", type="password", value=w_cloud_key, key="w_key")
+        if w_cloud_key:
+            st.success("✅ 已检测到云端密钥，直接联网生成（无需粘贴）")
+        else:
+            st.caption("没填 Key 则走演示模式。也可在部署平台 Secrets 配置密钥后免填。")
+        wa, wb = st.columns(2)
+        with wa:
+            w_url = st.text_input("API Base URL", value=PRESETS[w_provider]["base_url"], key="w_url")
+        with wb:
+            w_model = st.text_input("模型名", value=PRESETS[w_provider]["model"], key="w_model")
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("**原始文案：**")
+    w_text = st.text_area("在这里粘贴你的文案（中文即可）", height=140, key="w_text",
+                          placeholder="例如：我做了一个小工具站，里面有 PDF 转 Excel、AI 配图、二维码、文字转语音等 12 款工具，全部免费。")
+    w_platform = st.selectbox("目标平台风格", rewrite_platforms(), index=0, key="w_platform")
+    if st.button("🚀 一键改写", use_container_width=True, key="w_go"):
+        if not w_text.strip():
+            st.warning("先粘贴一下要改写的文案～")
+        else:
+            mock = (not w_key.strip()) or (not w_url.strip())
+            with st.spinner("演示模式（未联网）…" if mock else "AI 改写中…"):
+                try:
+                    out = rewrite_copy(w_text, w_platform, w_key, w_url, w_model, mock=mock)
+                except Exception as e:
+                    st.error(f"出错：{e}")
+                    out = None
+            if out:
+                st.markdown("**改写结果：**")
+                st.markdown(f'<div class="box">{out.replace(chr(10), "<br>")}</div>', unsafe_allow_html=True)
+                st.download_button("⬇️ 下载文案", data=out, file_name=f"{w_platform}文案.txt", mime="text/plain")
+                if mock:
+                    st.caption("当前为演示模式（未联网）。配置 Key 后即为真实 AI 改写。")
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
@@ -652,6 +695,7 @@ if st.session_state["active_tool"] == "about":
     - 🔳 **二维码生成器** —— 对标海外引流/营销类小工具（本地免 Key）
     - 🔊 **文字转语音 TTS** —— 基于微软免费接口，免 Key 生成中文语音 MP3
     - 📑 **PDF 合并 / 加水印** —— 对标海外 PDF 类小工具（$40K/月级，本地免 Key）
+    - ✍️ **多平台文案改写** —— 一稿多发引流神器，小红书/公众号/抖音/微博/知乎风格一键切换（填 Key 联网）
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)
