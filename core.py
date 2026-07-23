@@ -35,9 +35,35 @@ try:
     from pypdf import PdfReader, PdfWriter
     from reportlab.pdfgen import canvas as _rl_canvas
     from reportlab.lib.pagesizes import letter as _rl_letter
+    from reportlab.pdfbase import pdfmetrics as _rl_pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont as _rl_TTFont
     _PDF_AVAILABLE = True
 except Exception:
     _PDF_AVAILABLE = False
+
+
+def _register_pdf_cjk_font():
+    """为 reportlab 注册一个能显示中文的字体，跨平台找常见字体文件。"""
+    if not _PDF_AVAILABLE:
+        return None
+    candidates = [
+        # Windows
+        ("MicrosoftYaHei", "C:/Windows/Fonts/msyh.ttc"),
+        ("SimHei", "C:/Windows/Fonts/simhei.ttf"),
+        ("SimSun", "C:/Windows/Fonts/simsun.ttc"),
+        # Linux 常见
+        ("WenQuanYiZenHei", "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+        ("WenQuanYiMicroHei", "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
+        ("NotoSansCJK", "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
+        ("DejaVuSans", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    ]
+    for name, path in candidates:
+        try:
+            _rl_pdfmetrics.registerFont(_rl_TTFont(name, path))
+            return name
+        except Exception:
+            continue
+    return None
 
 # ===================== PDF 转 Excel =====================
 def pdf_extract_tables(pdf_bytes):
@@ -758,10 +784,13 @@ def pdf_add_watermark(pdf_bytes, text, *, angle=-30, opacity=0.18,
     step = {1: 320, 2: 240, 3: 170}.get(density, 240)
     r, g, b = color
 
+    # 注册中文字体；找不到则 fallback 到 Helvetica-Bold（中文会显示异常）
+    font_name = _register_pdf_cjk_font() or "Helvetica-Bold"
+
     wm_buf = io.BytesIO()
     c = _rl_canvas.Canvas(wm_buf, pagesize=(w, h))
     c.setFillColorRGB(r / 255.0, g / 255.0, b / 255.0, alpha=opacity)
-    c.setFont("Helvetica-Bold", font_size)
+    c.setFont(font_name, font_size)
     c.rotate(angle)
     # 旋转后坐标空间变了，用足够大的网格覆盖
     span = int((w + h) * 1.5)
