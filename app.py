@@ -16,6 +16,7 @@ from core import (
     tts_generate, tts_voices,
     pdf_merge, pdf_add_watermark, pdf_page_count,
     rewrite_platforms, rewrite_copy,
+    shorten_services, shorten_url,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -66,7 +67,7 @@ TOOLS = [
     ("🛂 签证", "visa"), ("📈 数据", "data"), ("🗄️ 导入", "airtable"),
     ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("🔳 二维码", "qr"),
     ("🔊 语音", "tts"), ("📑 合并", "pdfmerge"), ("✍️ 改写", "rewrite"),
-    ("💡 关于", "about"),
+    ("🔗 短链", "short"), ("💡 关于", "about"),
 ]
 PER_ROW = 6
 if "active_tool" not in st.session_state:
@@ -685,6 +686,34 @@ if st.session_state["active_tool"] == "rewrite":
                 if mock:
                     st.caption("当前为演示模式（未联网）。配置 Key 后即为真实 AI 改写。")
 
+# ---------------- Tab 13: 短链接生成器 ----------------
+if st.session_state["active_tool"] == "short":
+    st.markdown("### 🔗 短链接生成器")
+    st.markdown("把冗长的网址（文章、商品、工具站链接）缩短成清爽短链，方便在社媒/二维码里分享引流。**免 Key、免注册**，调用免费公共接口。")
+    with st.container():
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        s_url = st.text_input("要缩短的网址", key="s_url",
+                              placeholder="https://pandy-hu-tools-hub-app-ux8bug.streamlit.app")
+        s_service = st.selectbox("短链服务", shorten_services(), index=0, key="s_service")
+        st.markdown('</div>', unsafe_allow_html=True)
+    if st.button("🚀 生成短链", use_container_width=True, key="s_go"):
+        if not s_url.strip():
+            st.warning("先填一下要缩短的网址～")
+        else:
+            with st.spinner("生成中（需联网调用短链服务）…"):
+                try:
+                    short = shorten_url(s_url.strip(), s_service)
+                    st.session_state["short_result"] = short
+                except Exception as e:
+                    st.error(f"生成失败：{e}")
+                    st.session_state["short_result"] = ""
+    res = st.session_state.get("short_result", "")
+    if res:
+        st.success("✅ 短链已生成！")
+        st.code(res, language="text")
+        st.markdown(f"👉 [点击打开]({res})")
+        st.caption("上方灰框右侧有复制按钮，一键复制短链。")
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
@@ -703,6 +732,7 @@ if st.session_state["active_tool"] == "about":
     - 🔊 **文字转语音 TTS** —— 基于微软免费接口，免 Key 生成中文语音 MP3
     - 📑 **PDF 合并 / 加水印** —— 对标海外 PDF 类小工具（$40K/月级，本地免 Key）
     - ✍️ **多平台文案改写** —— 一稿多发引流神器，小红书/公众号/抖音/微博/知乎风格一键切换（填 Key 联网）
+    - 🔗 **短链接生成器** —— 把长链接缩短成清爽短链，方便社媒/二维码分享引流（免 Key、免注册）
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)
