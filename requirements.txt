@@ -7,3 +7,5 @@ plotly
 Pillow
 qrcode
 edge-tts
+pypdf
+reportlab

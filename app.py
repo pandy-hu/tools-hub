@@ -14,6 +14,7 @@ from core import (
     image_process, image_tool_formats,
     qr_generate,
     tts_generate, tts_voices,
+    pdf_merge, pdf_add_watermark, pdf_page_count,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -56,7 +57,7 @@ TOOLS = [
     ("📄 PDF", "pdf"), ("📊 公式", "formula"), ("📋 简历", "resume"),
     ("🛂 签证", "visa"), ("📈 数据", "data"), ("🗄️ 导入", "airtable"),
     ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("🔳 二维码", "qr"),
-    ("🔊 语音", "tts"), ("💡 关于", "about"),
+    ("🔊 语音", "tts"), ("📑 合并", "pdfmerge"), ("💡 关于", "about"),
 ]
 PER_ROW = 6
 if "active_tool" not in st.session_state:
@@ -584,6 +585,56 @@ if st.session_state["active_tool"] == "tts":
                 except Exception as e:
                     st.error(f"生成失败：{e}")
 
+# ---------------- Tab 11: PDF 合并 / 加水印 ----------------
+if st.session_state["active_tool"] == "pdfmerge":
+    st.markdown("### 📑 PDF 合并 / 加水印")
+    st.markdown("上传多个 PDF 一键合并，或给 PDF 批量加平铺文字水印。**纯本地处理，不上传服务器。**")
+    mode = st.radio("模式", ["合并多个 PDF", "给 PDF 加水印"], key="pm_mode", horizontal=True)
+    uploaded = st.file_uploader("上传 PDF 文件", type=["pdf"], accept_multiple_files=True, key="pm_up")
+
+    if mode == "合并多个 PDF":
+        if uploaded:
+            st.caption(f"已选择 {len(uploaded)} 个文件，将按上传顺序合并")
+            if st.button("🚀 合并并下载", use_container_width=True, key="pm_merge_go"):
+                with st.spinner("合并中…"):
+                    try:
+                        pdfs = [(f.name, f.read()) for f in uploaded]
+                        out, n = pdf_merge(pdfs)
+                        st.success(f"✅ 合并完成，共 {n} 页")
+                        st.download_button("⬇️ 下载合并后的 PDF", data=out,
+                                           file_name="merged.pdf", mime="application/pdf")
+                    except Exception as e:
+                        st.error(f"合并失败：{e}")
+        else:
+            st.info("👆 先上传 2 个或更多 PDF")
+    else:
+        if uploaded:
+            cnt = None
+            if len(uploaded) == 1:
+                cnt = pdf_page_count(uploaded[0].getvalue())
+            st.caption(f"已选择 {len(uploaded)} 个文件" + (f"，首页 {cnt} 页" if cnt else ""))
+            wm_text = st.text_input("水印文字", value="小工具站 · 机密", key="pm_wm_text")
+            c1, c2 = st.columns(2)
+            with c1:
+                density = st.selectbox("水印密度", ["稀疏", "中等", "密集"], index=1, key="pm_density")
+            with c2:
+                opacity = st.slider("不透明度", 5, 50, 18, key="pm_opacity")
+            density_map = {"稀疏": 1, "中等": 2, "密集": 3}
+            if st.button("🚀 加水印并下载", use_container_width=True, key="pm_wm_go"):
+                with st.spinner("加水印中…"):
+                    try:
+                        src = uploaded[0].getvalue()
+                        out, n = pdf_add_watermark(src, wm_text,
+                                                  density=density_map.get(density, 2),
+                                                  opacity=opacity / 100.0)
+                        st.success(f"✅ 已加水印，共 {n} 页")
+                        st.download_button("⬇️ 下载加水印的 PDF", data=out,
+                                           file_name="watermarked.pdf", mime="application/pdf")
+                    except Exception as e:
+                        st.error(f"加水印失败：{e}")
+        else:
+            st.info("👆 先上传 1 个 PDF")
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
@@ -600,6 +651,7 @@ if st.session_state["active_tool"] == "about":
     - 🖼️ **图片处理工具箱** —— 对标海外图片压缩类小工具（$5K-20K/月，本地免 Key）
     - 🔳 **二维码生成器** —— 对标海外引流/营销类小工具（本地免 Key）
     - 🔊 **文字转语音 TTS** —— 基于微软免费接口，免 Key 生成中文语音 MP3
+    - 📑 **PDF 合并 / 加水印** —— 对标海外 PDF 类小工具（$40K/月级，本地免 Key）
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)

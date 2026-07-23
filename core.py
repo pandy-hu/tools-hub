@@ -31,6 +31,14 @@ try:
 except Exception:
     _TTS_AVAILABLE = False
 
+try:
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.pdfgen import canvas as _rl_canvas
+    from reportlab.lib.pagesizes import letter as _rl_letter
+    _PDF_AVAILABLE = True
+except Exception:
+    _PDF_AVAILABLE = False
+
 # ===================== PDF 转 Excel =====================
 def pdf_extract_tables(pdf_bytes):
     """返回 [(页码, 表序号, 二维表)] —— 二维表为 list[list[str|None]]。"""
@@ -702,3 +710,88 @@ def tts_generate(text, voice_label="晓晓（女·甜美）", rate="+0%", pitch=
             os.unlink(tmp.name)
         except Exception:
             pass
+
+
+# ===================== PDF 合并 / 加水印 =====================
+def pdf_merge(pdf_list):
+    """合并多个 PDF 字节流，返回 (合并后字节, 页数)。pdf_list: [(文件名, 字节)]。"""
+    if not _PDF_AVAILABLE:
+        raise EnvironmentError("PDF 处理需要 pypdf 库，请确认 requirements.txt 中包含 pypdf")
+    if not pdf_list:
+        raise ValueError("请先上传至少一个 PDF 文件")
+    writer = PdfWriter()
+    for _name, raw in pdf_list:
+        reader = PdfReader(io.BytesIO(raw))
+        writer.append(reader)
+    out = io.BytesIO()
+    writer.write(out)
+    out.seek(0)
+    n = len(PdfReader(out).pages)
+    return out.getvalue(), n
+
+
+def pdf_add_watermark(pdf_bytes, text, *, angle=-30, opacity=0.18,
+                      color=(128, 128, 128), font_size=48, density=1):
+    """给 PDF 每页加平铺文字水印，返回 (加水印后字节, 页数)。
+    density: 1=稀疏, 2=中等, 3=密集。
+    """
+    if not _PDF_AVAILABLE:
+        raise EnvironmentError("PDF 处理需要 pypdf 库，请确认 requirements.txt 中包含 pypdf")
+    if not pdf_bytes:
+        raise ValueError("请先上传 PDF 文件")
+    if not text or not text.strip():
+        raise ValueError("水印文字不能为空")
+    text = text.strip()
+
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    n = len(reader.pages)
+    if n == 0:
+        raise ValueError("PDF 没有页面")
+
+    # 用 reportlab 生成一张与首页同尺寸的水印图层
+    first_page = reader.pages[0]
+    box = first_page.mediabox
+    w = float(box.width)
+    h = float(box.height)
+
+    # 平铺间距随密度变化
+    step = {1: 320, 2: 240, 3: 170}.get(density, 240)
+    r, g, b = color
+
+    wm_buf = io.BytesIO()
+    c = _rl_canvas.Canvas(wm_buf, pagesize=(w, h))
+    c.setFillColorRGB(r / 255.0, g / 255.0, b / 255.0, alpha=opacity)
+    c.setFont("Helvetica-Bold", font_size)
+    c.rotate(angle)
+    # 旋转后坐标空间变了，用足够大的网格覆盖
+    span = int((w + h) * 1.5)
+    x = -span
+    while x < span:
+        y = -span
+        while y < span:
+            c.drawString(x, y, text)
+            y += step
+        x += step + font_size
+    c.save()
+    wm_buf.seek(0)
+    wm_reader = PdfReader(wm_buf)
+    wm_page = wm_reader.pages[0]
+
+    writer = PdfWriter()
+    for page in reader.pages:
+        page.merge_page(wm_page)
+        writer.add_page(page)
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue(), n
+
+
+def pdf_page_count(pdf_bytes):
+    """返回 PDF 页数。"""
+    if not _PDF_AVAILABLE:
+        return None
+    try:
+        return len(PdfReader(io.BytesIO(pdf_bytes)).pages)
+    except Exception:
+        return None
+
