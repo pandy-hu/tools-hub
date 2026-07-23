@@ -694,7 +694,14 @@ if st.session_state["active_tool"] == "short":
         st.markdown('<div class="card">', unsafe_allow_html=True)
         s_url = st.text_input("要缩短的网址", key="s_url",
                               placeholder="https://pandy-hu-tools-hub-app-ux8bug.streamlit.app")
-        s_service = st.selectbox("短链服务", shorten_services(), index=0, key="s_service")
+        s_service = st.selectbox(
+            "短链服务",
+            shorten_services(),
+            index=0,
+            key="s_service",
+            help="微信/QQ/公众号域名常被 is.gd/v.gd 拦截，请选 tinyurl.com 或 cleanuri.com",
+        )
+        st.caption("💡 如果缩短微信公众号/QQ 链接失败，请切换为 **tinyurl.com** 或 **cleanuri.com**。")
         st.markdown('</div>', unsafe_allow_html=True)
     if st.button("🚀 生成短链", use_container_width=True, key="s_go"):
         if not s_url.strip():

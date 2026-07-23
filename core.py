@@ -887,8 +887,31 @@ def pdf_page_count(pdf_bytes):
 
 # ===================== 短链接生成 =====================
 SHORTEN_SERVICES = {
-    "is.gd (推荐·稳定)": "https://is.gd/create.php?format=simple&url=",
-    "v.gd (更短域名)": "https://v.gd/create.php?format=simple&url=",
+    # tinyurl / cleanuri 对微信/QQ 域名更友好；is.gd/v.gd 近期对很多域名会黑名单或数据库失败
+    "tinyurl.com (兼容微信/QQ)": {
+        "endpoint": "https://tinyurl.com/api-create.php",
+        "method": "GET",
+        "params": lambda url: {"url": url},
+        "extract": lambda resp: resp.text.strip(),
+    },
+    "cleanuri.com (兼容微信/QQ)": {
+        "endpoint": "https://cleanuri.com/api/v1/shorten",
+        "method": "POST",
+        "data": lambda url: {"url": url},
+        "extract": lambda resp: resp.json().get("result_url", "").strip(),
+    },
+    "is.gd (国际通用)": {
+        "endpoint": "https://is.gd/create.php",
+        "method": "GET",
+        "params": lambda url: {"format": "simple", "url": url},
+        "extract": lambda resp: resp.text.strip(),
+    },
+    "v.gd (国际通用)": {
+        "endpoint": "https://v.gd/create.php",
+        "method": "GET",
+        "params": lambda url: {"format": "simple", "url": url},
+        "extract": lambda resp: resp.text.strip(),
+    },
 }
 
 
@@ -898,23 +921,32 @@ def shorten_services():
 
 def shorten_url(url, service="is.gd (推荐·稳定)", timeout=15):
     """调用免费短链服务把长链接缩短，返回短网址字符串。
-    使用 is.gd / v.gd 公共 API，免 Key、免注册。
+    支持 is.gd / v.gd / tinyurl / cleanuri，免 Key、免注册。
+    微信/QQ 域名可能被 is.gd/v.gd 黑名单拦截，可切 tinyurl/cleanuri。
     """
     url = (url or "").strip()
     if not url:
         raise ValueError("请先输入要缩短的网址")
     if not (url.startswith("http://") or url.startswith("https://")):
         raise ValueError("网址需以 http:// 或 https:// 开头")
-    endpoint = SHORTEN_SERVICES.get(service, SHORTEN_SERVICES["is.gd (推荐·稳定)"])
+    cfg = SHORTEN_SERVICES.get(service, SHORTEN_SERVICES["is.gd (推荐·稳定)"])
     try:
-        resp = requests.get(endpoint + quote(url, safe=""), timeout=timeout)
+        kwargs = {"timeout": timeout}
+        if "params" in cfg:
+            kwargs["params"] = cfg["params"](url)
+        if "data" in cfg:
+            kwargs["data"] = cfg["data"](url)
+        resp = requests.request(cfg["method"], cfg["endpoint"], **kwargs)
     except Exception as e:
         raise RuntimeError(f"请求短链服务失败（可能网络受限）：{e}")
     if resp.status_code != 200:
         raise RuntimeError(f"短链服务返回错误状态码 {resp.status_code}")
-    text = resp.text.strip()
-    # is.gd / v.gd 失败时会返回 "Error: ..." 文本
-    if text.lower().startswith("error"):
-        raise ValueError(f"短链生成失败：{text}")
+    text = cfg["extract"](resp)
+    # is.gd / v.gd / tinyurl 失败时会返回 "Error: ..." 文本；cleanuri 失败会无 result_url
+    if (not text) or (text.lower().startswith("error")):
+        detail = text or "未返回短链结果"
+        if "blacklist" in detail.lower():
+            raise ValueError(f"该域名被此服务列入黑名单，请换用 tinyurl.com / cleanuri.com：{detail}")
+        raise ValueError(f"短链生成失败：{detail}")
     return text
 
