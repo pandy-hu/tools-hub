@@ -38,6 +38,15 @@ def get_cloud_key(provider):
         return ""
 
 
+def _secret(key, default=""):
+    """安全读取 Streamlit Secrets：当部署环境没有任何 secrets 文件时，
+    st.secrets.get 会抛 StreamlitSecretNotFoundError，这里捕获并返回默认值，避免整页崩溃。"""
+    try:
+        return st.secrets.get(key, default)
+    except Exception:
+        return default
+
+
 PRIMARY = "#2D6CDF"
 st.markdown(f"""
 <style>
@@ -820,7 +829,7 @@ if st.session_state["active_tool"] == "about":
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)
-    upgrade_url = st.secrets.get("UPGRADE_URL", "")
+    upgrade_url = _secret("UPGRADE_URL", "")
     st.markdown("### 🔓 升级高级版")
     if upgrade_url:
         st.markdown(f"解锁 **批量处理 / API 接口 / 去演示限制 / 定制功能**，点这里 👉 [{upgrade_url}]({upgrade_url})")
@@ -831,9 +840,9 @@ if st.session_state["active_tool"] == "about":
 
     # ---------------- 赞助 / 打赏 ----------------
     st.markdown("### ☕ 赞助 / 打赏")
-    sponsor_url = st.secrets.get("SPONSOR_URL", "")
-    sponsor_text = st.secrets.get("SPONSOR_TEXT", "如果这个工具帮到了你，请我喝杯奶茶 ☕")
-    sponsor_icon = st.secrets.get("SPONSOR_ICON", "☕")
+    sponsor_url = _secret("SPONSOR_URL", "")
+    sponsor_text = _secret("SPONSOR_TEXT", "如果这个工具帮到了你，请我喝杯奶茶 ☕")
+    sponsor_icon = _secret("SPONSOR_ICON", "☕")
     if sponsor_url:
         st.markdown(f"""
         <div class="card" style="text-align:center;">
