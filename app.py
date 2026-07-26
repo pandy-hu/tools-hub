@@ -17,6 +17,7 @@ from core import (
     pdf_merge, pdf_add_watermark, pdf_page_count,
     rewrite_platforms, rewrite_copy,
     shorten_services, shorten_url,
+    remove_bg,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -67,7 +68,7 @@ TOOLS = [
     ("🛂 签证", "visa"), ("📈 数据", "data"), ("🗄️ 导入", "airtable"),
     ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("🔳 二维码", "qr"),
     ("🔊 语音", "tts"), ("📑 合并", "pdfmerge"), ("✍️ 改写", "rewrite"),
-    ("🔗 短链", "short"), ("💡 关于", "about"),
+    ("🔗 短链", "short"), ("🧹 去背", "bg"), ("💡 关于", "about"),
 ]
 PER_ROW = 6
 if "active_tool" not in st.session_state:
@@ -721,6 +722,37 @@ if st.session_state["active_tool"] == "short":
         st.markdown(f"👉 [点击打开]({res})")
         st.caption("上方灰框右侧有复制按钮，一键复制短链。")
 
+# ---------------- Tab 14: 图片智能去背景 ----------------
+if st.session_state["active_tool"] == "bg":
+    st.markdown("### 🧹 图片智能去背景")
+    st.markdown("上传带背景的图（人像、商品、Logo），一键抠出主体，生成透明 PNG 或白底/纯色底图。**本地 AI 模型处理，文件不上传任何服务器**，适合做小红书封面、电商图、贴纸。")
+    bg_up = st.file_uploader("拖入或点击上传图片", type=["png", "jpg", "jpeg", "webp"], key="bg_up")
+    bg_type = st.radio("输出背景", ["透明 PNG（默认）", "白底", "自定义纯色底"], key="bg_type", horizontal=True)
+    bg_color = (255, 255, 255)
+    if bg_type == "自定义纯色底":
+        b1, b2, b3 = st.columns(3)
+        r = b1.number_input("R", 0, 255, 255, key="bgr")
+        g = b2.number_input("G", 0, 255, 255, key="bgg")
+        b = b3.number_input("B", 0, 255, 255, key="bgb")
+        bg_color = (int(r), int(g), int(b))
+    if st.button("🚀 开始去背景", use_container_width=True, key="bg_go"):
+        if bg_up is None:
+            st.warning("先上传一张图片～")
+        else:
+            btype = {"透明 PNG（默认）": "transparent", "白底": "white", "自定义纯色底": "color"}[bg_type]
+            with st.spinner("AI 抠图中（首次需下载模型，稍慢）…"):
+                try:
+                    out_bytes = remove_bg(bg_up.read(), bg_type=btype, bg_color=bg_color)
+                    st.session_state["bg_result"] = out_bytes
+                    st.success("✅ 去背景完成！")
+                except Exception as e:
+                    st.error(f"处理失败：{e}")
+                    st.session_state["bg_result"] = b""
+    out = st.session_state.get("bg_result", b"")
+    if out:
+        st.image(out, caption="去背景结果预览", use_column_width=True)
+        st.download_button("⬇️ 下载 PNG", data=out, file_name="nobg.png", mime="image/png")
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
@@ -740,6 +772,7 @@ if st.session_state["active_tool"] == "about":
     - 📑 **PDF 合并 / 加水印** —— 对标海外 PDF 类小工具（$40K/月级，本地免 Key）
     - ✍️ **多平台文案改写** —— 一稿多发引流神器，小红书/公众号/抖音/微博/知乎风格一键切换（填 Key 联网）
     - 🔗 **短链接生成器** —— 把长链接缩短成清爽短链，方便社媒/二维码分享引流（免 Key、免注册）
+    - 🧹 **图片智能去背景** —— 本地 AI 抠图，生成透明/白底/纯色底 PNG，做封面/电商图/贴纸（文件不上传）
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)

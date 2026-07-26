@@ -9,3 +9,5 @@ qrcode
 edge-tts
 pypdf
 reportlab
+rembg
+onnxruntime

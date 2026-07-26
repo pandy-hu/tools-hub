@@ -950,3 +950,43 @@ def shorten_url(url, service="is.gd (推荐·稳定)", timeout=15):
         raise ValueError(f"短链生成失败：{detail}")
     return text
 
+
+# ===================== 图片智能去背景 =====================
+try:
+    from rembg import remove as _rembg_remove
+    _REMBG_AVAILABLE = True
+except Exception:
+    _REMBG_AVAILABLE = False
+
+
+def remove_bg(image_bytes, *, bg_type="transparent", bg_color=(255, 255, 255)):
+    """用 rembg 移除图片背景。
+    bg_type: transparent(透明 PNG) / white(白底) / color(自定义纯色底)。
+    返回 PNG 字节。
+    """
+    if not _PIL_AVAILABLE:
+        raise EnvironmentError("图片处理需要 Pillow")
+    if not _REMBG_AVAILABLE:
+        raise EnvironmentError("智能去背景需要 rembg 库（含 onnxruntime），请确认 requirements.txt 包含 rembg")
+    if not image_bytes:
+        raise ValueError("请先上传图片")
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except Exception:
+        raise ValueError("图片无法识别，请换一张 PNG/JPG")
+    # rembg 返回 RGBA
+    cut = _rembg_remove(img)
+    if bg_type == "transparent":
+        final = cut
+    else:
+        if bg_type == "color":
+            rgb = tuple(int(c) for c in bg_color[:3])
+        else:
+            rgb = (255, 255, 255)
+        base = Image.new("RGBA", cut.size, rgb + (255,))
+        final = Image.alpha_composite(base, cut)
+    buf = io.BytesIO()
+    final.save(buf, "PNG")
+    return buf.getvalue()
+
+
