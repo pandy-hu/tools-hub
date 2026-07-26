@@ -17,7 +17,7 @@ from core import (
     pdf_merge, pdf_add_watermark, pdf_page_count,
     rewrite_platforms, rewrite_copy,
     shorten_services, shorten_url,
-    remove_bg,
+    remove_bg, grid_split,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -68,7 +68,8 @@ TOOLS = [
     ("🛂 签证", "visa"), ("📈 数据", "data"), ("🗄️ 导入", "airtable"),
     ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("🔳 二维码", "qr"),
     ("🔊 语音", "tts"), ("📑 合并", "pdfmerge"), ("✍️ 改写", "rewrite"),
-    ("🔗 短链", "short"), ("🧹 去背", "bg"), ("💡 关于", "about"),
+    ("🔗 短链", "short"), ("🧹 去背", "bg"), ("🧩 九宫格", "grid"),
+    ("💡 关于", "about"),
 ]
 PER_ROW = 6
 if "active_tool" not in st.session_state:
@@ -753,6 +754,48 @@ if st.session_state["active_tool"] == "bg":
         st.image(out, caption="去背景结果预览", use_column_width=True)
         st.download_button("⬇️ 下载 PNG", data=out, file_name="nobg.png", mime="image/png")
 
+# ---------------- Tab 15: 九宫格切图 ----------------
+if st.session_state["active_tool"] == "grid":
+    st.markdown("### 🧩 九宫格切图")
+    st.caption("上传一张图，切成 N×N 网格，方便小红书九宫格发布。纯本地处理，图片不上传任何服务器。")
+    grid_up = st.file_uploader("上传图片", type=["png", "jpg", "jpeg", "webp"], key="grid_up")
+    g_cols_row = st.columns(2)
+    with g_cols_row[0]:
+        g_rows = st.number_input("行数", min_value=1, max_value=6, value=3, step=1, key="g_rows")
+    with g_cols_row[1]:
+        g_cols = st.number_input("列数", min_value=1, max_value=6, value=3, step=1, key="g_cols")
+    if st.button("✂️ 开始切图", use_container_width=True, key="grid_go"):
+        if not grid_up:
+            st.warning("请先上传一张图片")
+        else:
+            try:
+                pieces, n = grid_split(grid_up.read(), rows=int(g_rows), cols=int(g_cols))
+                st.session_state["grid_pieces"] = pieces
+                st.session_state["grid_rc"] = (int(g_rows), int(g_cols))
+                st.success(f"切好啦！共 {n} 张（{g_rows}×{g_cols}）")
+            except Exception as e:
+                st.error(f"切图失败：{e}")
+    pieces = st.session_state.get("grid_pieces", [])
+    if pieces:
+        r_n, c_n = st.session_state.get("grid_rc", (3, 3))
+        st.markdown("#### 预览（按从左到右、从上到下顺序）")
+        prev_cols = st.columns(c_n)
+        for i, p in enumerate(pieces):
+            with prev_cols[i % c_n]:
+                st.image(p, use_column_width=True, caption=f"{i+1}")
+        st.markdown("#### 单独下载")
+        d_cols = st.columns(min(len(pieces), 6))
+        for i, p in enumerate(pieces):
+            with d_cols[i % len(d_cols)]:
+                st.download_button(f"⬇️ {i+1}", data=p, file_name=f"grid_{i+1}.png", mime="image/png")
+        import zipfile
+        zbuf = io.BytesIO()
+        with zipfile.ZipFile(zbuf, "w") as z:
+            for i, p in enumerate(pieces):
+                z.writestr(f"grid_{i+1}.png", p)
+        st.download_button("📦 下载全部（ZIP）", data=zbuf.getvalue(),
+                           file_name="grid_all.zip", mime="application/zip", use_container_width=True)
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
@@ -773,6 +816,7 @@ if st.session_state["active_tool"] == "about":
     - ✍️ **多平台文案改写** —— 一稿多发引流神器，小红书/公众号/抖音/微博/知乎风格一键切换（填 Key 联网）
     - 🔗 **短链接生成器** —— 把长链接缩短成清爽短链，方便社媒/二维码分享引流（免 Key、免注册）
     - 🧹 **图片智能去背景** —— 本地 AI 抠图，生成透明/白底/纯色底 PNG，做封面/电商图/贴纸（文件不上传）
+    - 🧩 **九宫格切图** —— 上传一张图切成 3×3 九张，小红书九宫格发布神器（纯本地、零上传）
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)

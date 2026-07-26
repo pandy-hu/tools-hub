@@ -990,3 +990,36 @@ def remove_bg(image_bytes, *, bg_type="transparent", bg_color=(255, 255, 255)):
     return buf.getvalue()
 
 
+# ===================== 九宫格切图 =====================
+def grid_split(image_bytes, *, rows=3, cols=3):
+    """把一张图切成 rows x cols 网格，返回 (每张 PNG 字节列表, 张数)。
+    用于小红书九宫格发布。纯本地 Pillow，零依赖、零上传。
+    """
+    if not _PIL_AVAILABLE:
+        raise EnvironmentError("图片处理需要 Pillow 库，请确认 requirements.txt 中包含 Pillow")
+    if not image_bytes:
+        raise ValueError("请先上传一张图片")
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+    except Exception:
+        raise ValueError("无法读取该图片，请换一张 PNG/JPG")
+    img = img.convert("RGB")
+    w, h = img.size
+    if rows < 1 or cols < 1:
+        raise ValueError("行数和列数必须 ≥ 1")
+    # 取中央区域，保证整除、无缝拼接、不变形
+    cw, ch = w // cols, h // rows
+    left = (w - cw * cols) // 2
+    top = (h - ch * rows) // 2
+    img = img.crop((left, top, left + cw * cols, top + ch * rows))
+    pieces = []
+    for r in range(rows):
+        for c in range(cols):
+            x0, y0 = c * cw, r * ch
+            piece = img.crop((x0, y0, x0 + cw, y0 + ch))
+            buf = io.BytesIO()
+            piece.save(buf, "PNG")
+            pieces.append(buf.getvalue())
+    return pieces, len(pieces)
+
+
