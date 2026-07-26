@@ -20,6 +20,12 @@ from core import (
     rewrite_platforms, rewrite_copy,
     shorten_services, shorten_url,
     remove_bg, grid_split,
+    markdown_to_image,
+    text_cipher,
+    calc_loan, calc_bmi, calc_compound, calc_installment, calc_income_tax,
+    qr_decode,
+    speech_to_text,
+    webpage_screenshot,
 )
 
 st.set_page_config(page_title="小工具站 · 一组能赚钱的小工具", page_icon="🧰", layout="centered")
@@ -80,6 +86,8 @@ TOOLS = [
     ("🎨 配图", "poster"), ("🖼️ 图片", "image"), ("🔳 二维码", "qr"),
     ("🔊 语音", "tts"), ("📑 合并", "pdfmerge"), ("✍️ 改写", "rewrite"),
     ("🔗 短链", "short"), ("🧹 去背", "bg"), ("🧩 九宫格", "grid"),
+    ("📝 转图", "md"), ("🔐 加解密", "cipher"), ("🎙️ 识别", "stt"),
+    ("📷 识码", "qrdecode"), ("🌐 截图", "shot"), ("🧮 计算器", "calc"),
     ("💡 关于", "about"),
 ]
 PER_ROW = 6
@@ -806,6 +814,146 @@ if st.session_state["active_tool"] == "grid":
         st.download_button("📦 下载全部（ZIP）", data=zbuf.getvalue(),
                            file_name="grid_all.zip", mime="application/zip", use_container_width=True)
 
+# ---------------- Tab: Markdown 转图片 ----------------
+if st.session_state["active_tool"] == "md":
+    st.markdown("### 📝 Markdown / 文字 转图片")
+    st.caption("把一段文字或 Markdown 一键变成长图海报，发小红书/公众号超方便。纯本地生成，零上传。")
+    md_text = st.text_area("输入文字 / Markdown", value="# 小工具站\n一组免费好用的小工具\n\n- PDF 转 Excel\n- 公式机器人\n- AI 配图\n- 二维码生成\n\n> 零上传，纯本地处理", height=220, key="md_text")
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        md_width = st.selectbox("宽度", [600, 800, 1000], index=1, key="md_w")
+    with m2:
+        md_theme = st.selectbox("主题", ["light", "dark"], index=0, key="md_theme")
+    with m3:
+        md_accent = st.color_picker("强调色", "#2b6cb0", key="md_accent")
+    if st.button("🖼️ 生成图片", use_container_width=True, key="md_go"):
+        try:
+            png = markdown_to_image(md_text, width=md_width, theme=md_theme, accent=md_accent)
+            st.image(png, use_column_width=True)
+            st.download_button("⬇️ 下载 PNG", data=png, file_name="poster.png", mime="image/png", use_container_width=True)
+        except Exception as e:
+            st.error(f"生成失败：{e}")
+
+# ---------------- Tab: 文本加解密 ----------------
+if st.session_state["active_tool"] == "cipher":
+    st.markdown("### 🔐 文本加解密")
+    st.caption("Base64 编码 / AES 加解密，纯本地、零上传。AES 需自设密钥。")
+    cipher_text = st.text_area("输入文本", height=140, key="cipher_text")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        cipher_mode = st.selectbox("模式", ["encrypt", "decrypt"], key="cipher_mode")
+    with c2:
+        cipher_method = st.selectbox("方式", ["base64", "aes-ecb", "aes-cbc"], key="cipher_method")
+    with c3:
+        cipher_key = st.text_input("密钥(AES)", type="password", key="cipher_key")
+    if st.button("🔒 执行", use_container_width=True, key="cipher_go"):
+        try:
+            out = text_cipher(cipher_text, mode=cipher_mode, method=cipher_method, key=cipher_key)
+            st.code(out, language="text")
+        except Exception as e:
+            st.error(f"处理失败：{e}")
+
+# ---------------- Tab: 语音转文字 ----------------
+if st.session_state["active_tool"] == "stt":
+    st.markdown("### 🎙️ 语音转文字")
+    st.caption("本地 Whisper 识别，与「文字转语音」对称。文件零上传。首次使用会下载模型（约 40MB），稍慢。")
+    stt_up = st.file_uploader("上传音频", type=["wav", "mp3", "m4a", "ogg"], key="stt_up")
+    s1, s2 = st.columns(2)
+    with s1:
+        stt_model = st.selectbox("模型", ["tiny", "base", "small"], index=0, key="stt_model")
+    with s2:
+        stt_lang = st.selectbox("语言", ["zh", "en", "auto"], index=0, key="stt_lang")
+    if st.button("📝 开始识别", use_container_width=True, key="stt_go"):
+        if not stt_up:
+            st.warning("请先上传音频")
+        else:
+            lang = None if stt_lang == "auto" else stt_lang
+            try:
+                with st.spinner("识别中…首次需下载模型"):
+                    txt = speech_to_text(stt_up.read(), model_size=stt_model, language=lang or "zh")
+                st.success("识别完成")
+                st.text_area("识别结果", txt, height=200, key="stt_out")
+                st.download_button("⬇️ 下载文本", data=txt, file_name="transcript.txt", mime="text/plain")
+            except Exception as e:
+                st.error(f"识别失败：{e}")
+
+# ---------------- Tab: 二维码解析 ----------------
+if st.session_state["active_tool"] == "qrdecode":
+    st.markdown("### 📷 二维码解析")
+    st.caption("上传含二维码的图片，秒读内容。与「二维码生成」对称，纯本地、零上传。")
+    qr_up = st.file_uploader("上传图片", type=["png", "jpg", "jpeg", "webp"], key="qr_up")
+    if st.button("🔍 解析", use_container_width=True, key="qr_go"):
+        if not qr_up:
+            st.warning("请先上传图片")
+        else:
+            try:
+                data = qr_decode(qr_up.read())
+                st.success("识别成功")
+                st.code(data, language="text")
+            except Exception as e:
+                st.error(f"解析失败：{e}")
+
+# ---------------- Tab: 网页截图 ----------------
+if st.session_state["active_tool"] == "shot":
+    st.markdown("### 🌐 网页转图片截图")
+    st.caption("输入网址，生成整页截图。⚠️ 需在已安装 Playwright 浏览器的环境运行（云端通常未预装，建议本地部署后使用）。")
+    shot_url = st.text_input("网址", placeholder="https://example.com", key="shot_url")
+    d1, d2 = st.columns(2)
+    with d1:
+        shot_w = st.number_input("视口宽", min_value=320, max_value=2560, value=1280, step=80, key="shot_w")
+    with d2:
+        shot_full = st.checkbox("整页截图", value=True, key="shot_full")
+    if st.button("📸 截图", use_container_width=True, key="shot_go"):
+        if not shot_url:
+            st.warning("请输入网址")
+        else:
+            try:
+                with st.spinner("截图渲染中…"):
+                    png = webpage_screenshot(shot_url, width=shot_w, full_page=shot_full)
+                st.image(png, use_column_width=True)
+                st.download_button("⬇️ 下载 PNG", data=png, file_name="webpage.png", mime="image/png", use_container_width=True)
+            except Exception as e:
+                st.error(f"截图失败：{e}")
+
+# ---------------- Tab: 计算器集合 ----------------
+if st.session_state["active_tool"] == "calc":
+    st.markdown("### 🧮 在线计算器集合")
+    st.caption("房贷月供 / BMI / 复利 / 分期 / 个税，纯本地计算。")
+    calc_type = st.selectbox("选择计算器", ["房贷月供", "BMI", "复利终值", "商品分期", "个税估算"], key="calc_type")
+    if calc_type == "房贷月供":
+        a1 = st.number_input("贷款总额(元)", min_value=0.0, value=1000000.0, key="loan_p")
+        a2 = st.number_input("年利率(%)", min_value=0.0, value=4.2, key="loan_r")
+        a3 = st.number_input("期数(月)", min_value=1, value=360, key="loan_m")
+        if st.button("计算", key="loan_b"):
+            mm, ii, tt = calc_loan(a1, a2, int(a3))
+            st.success(f"月供 ¥{mm} ｜ 总利息 ¥{ii} ｜ 总还款 ¥{tt}")
+    elif calc_type == "BMI":
+        b1 = st.number_input("体重(kg)", min_value=0.0, value=65.0, key="bmi_w")
+        b2 = st.number_input("身高(cm)", min_value=0.0, value=170.0, key="bmi_h")
+        if st.button("计算", key="bmi_b"):
+            v, c = calc_bmi(b1, b2)
+            st.success(f"BMI {v} ｜ {c}")
+    elif calc_type == "复利终值":
+        c1 = st.number_input("本金(元)", min_value=0.0, value=10000.0, key="cp_p")
+        c2 = st.number_input("年化(%)", min_value=0.0, value=5.0, key="cp_r")
+        c3 = st.number_input("年数", min_value=1, value=10, key="cp_y")
+        if st.button("计算", key="cp_b"):
+            st.success(f"终值 ¥{calc_compound(c1, c2, int(c3))}")
+    elif calc_type == "商品分期":
+        d1 = st.number_input("总价(元)", min_value=0.0, value=8000.0, key="ins_p")
+        d2 = st.number_input("首付(%)", min_value=0.0, value=30.0, key="ins_d")
+        d3 = st.number_input("年利率(%)", min_value=0.0, value=6.0, key="ins_r")
+        d4 = st.number_input("期数(月)", min_value=1, value=12, key="ins_m")
+        if st.button("计算", key="ins_b"):
+            down, loan, m, i = calc_installment(d1, d2, d3, int(d4))
+            st.success(f"首付 ¥{down} ｜ 贷款 ¥{loan} ｜ 月供 ¥{m} ｜ 总利息 ¥{i}")
+    elif calc_type == "个税估算":
+        e1 = st.number_input("月应发(元)", min_value=0.0, value=20000.0, key="tax_s")
+        e2 = st.number_input("五险一金(元)", min_value=0.0, value=3000.0, key="tax_i")
+        if st.button("计算", key="tax_b"):
+            taxable, tax = calc_income_tax(e1, e2)
+            st.success(f"应纳税所得额 ¥{taxable} ｜ 月均个税 ¥{tax}")
+
 # ---------------- Tab 7: 关于 / 升级 ----------------
 if st.session_state["active_tool"] == "about":
     st.markdown("### 💡 关于这个小工具站")
@@ -827,6 +975,12 @@ if st.session_state["active_tool"] == "about":
     - 🔗 **短链接生成器** —— 把长链接缩短成清爽短链，方便社媒/二维码分享引流（免 Key、免注册）
     - 🧹 **图片智能去背景** —— 本地 AI 抠图，生成透明/白底/纯色底 PNG，做封面/电商图/贴纸（文件不上传）
     - 🧩 **九宫格切图** —— 上传一张图切成 3×3 九张，小红书九宫格发布神器（纯本地、零上传）
+    - 📝 **Markdown 转图片** —— 文字/Markdown 一键变长图海报，引流发图神器（纯本地、零上传）
+    - 🔐 **文本加解密** —— Base64 / AES 加解密，纯本地趣味小工具
+    - 🎙️ **语音转文字** —— 本地 Whisper 识别，与「文字转语音」对称（零上传）
+    - 📷 **二维码解析** —— 上传图秒读二维码内容，与「二维码生成」对称（零上传）
+    - 🌐 **网页转图片截图** —— 网址变整页截图（需本地已装 Playwright 浏览器）
+    - 🧮 **在线计算器集合** —— 房贷月供 / BMI / 复利 / 分期 / 个税，纯本地计算
 
     全部免费可用。PDF / 签证 / 数据 / 导入 工具本地运行、无需本站 Key；公式 / 简历 填 Key 即联网、不填也能看演示。
     """)

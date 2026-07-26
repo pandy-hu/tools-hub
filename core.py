@@ -1023,3 +1023,368 @@ def grid_split(image_bytes, *, rows=3, cols=3):
     return pieces, len(pieces)
 
 
+# ===================== Markdown / 文字 转图片海报 =====================
+def _md_font_path():
+    """跨平台中文字体：优先仓库内打包的 wqy-microhei，其次系统字体。"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    cands = [
+        os.path.join(here, "fonts", "wqy-microhei.ttc"),
+        "C:/Windows/Fonts/msyh.ttc",
+        "/System/Library/Fonts/PingFang.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ]
+    for c in cands:
+        if os.path.exists(c):
+            return c
+    return None
+
+
+def _load_font(size, bold=False):
+    path = _md_font_path()
+    if not path:
+        return ImageFont.load_default()
+    try:
+        return ImageFont.truetype(path, size)
+    except Exception:
+        return ImageFont.load_default()
+
+
+def _wrap_text(text, font, max_width):
+    """逐字符换行（中文友好；英文尽量在空格处断词）。返回行列表。"""
+    lines, cur = [], ""
+    for ch in text:
+        if ch == "\n":
+            lines.append(cur)
+            cur = ""
+            continue
+        if font.getlength(cur + ch) <= max_width:
+            cur += ch
+        else:
+            if ch == " " and " " in cur:
+                lines.append(cur)
+                cur = ""
+            else:
+                if cur:
+                    lines.append(cur)
+                cur = ch
+    lines.append(cur)
+    return lines
+
+
+def markdown_to_image(md_text, *, width=800, theme="light", accent="#2b6cb0"):
+    """把 Markdown 文本渲染成一张海报图片（PNG 字节）。
+
+    支持语法: #/##/### 标题、-/* 列表、> 引用、--- 分隔线、```代码块```、段落。
+    纯本地 Pillow 自研轻量排版，零上传；中文用仓库内打包字体，跨平台可用。
+    """
+    if not _PIL_AVAILABLE:
+        raise EnvironmentError("图片处理需要 Pillow 库，请确认 requirements.txt 中包含 Pillow")
+    if not md_text or not md_text.strip():
+        raise ValueError("请先输入要生成图片的文字")
+    md_text = md_text.replace("\r\n", "\n")
+
+    pad = 48
+    content_w = width - pad * 2
+    if theme == "dark":
+        bg, fg, sub, code_bg = (32, 33, 36), (225, 225, 225), (160, 160, 160), (55, 56, 60)
+    else:
+        bg, fg, sub, code_bg = (255, 255, 255), (45, 45, 45), (110, 110, 110), (238, 238, 238)
+    try:
+        accent_rgb = tuple(int(accent.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+    except Exception:
+        accent_rgb = (43, 108, 176)
+
+    cmds, in_code, code_buf = [], False, []
+    for raw in md_text.split("\n"):
+        line = raw.rstrip()
+        if line.strip().startswith("```"):
+            if not in_code:
+                in_code, code_buf = True, []
+            else:
+                in_code = False
+                cmds.append({"k": "code", "lines": code_buf})
+            continue
+        if in_code:
+            code_buf.append(line)
+            continue
+        s = line.strip()
+        if s == "":
+            cmds.append({"k": "space"})
+        elif s in ("---", "***", "___"):
+            cmds.append({"k": "hr"})
+        elif s.startswith("# "):
+            cmds.append({"k": "h", "lv": 1, "t": s[2:].strip()})
+        elif s.startswith("## "):
+            cmds.append({"k": "h", "lv": 2, "t": s[3:].strip()})
+        elif s.startswith("### "):
+            cmds.append({"k": "h", "lv": 3, "t": s[4:].strip()})
+        elif s.startswith("> "):
+            cmds.append({"k": "quote", "t": s[2:].strip()})
+        elif s.startswith("- ") or s.startswith("* "):
+            cmds.append({"k": "li", "t": s[2:].strip()})
+        else:
+            cmds.append({"k": "p", "t": s})
+
+    def hfont(lv):
+        return _load_font({1: 34, 2: 26, 3: 21}.get(lv, 21))
+
+    pfont, codefont = _load_font(18), _load_font(15)
+    rendered, y = [], pad
+    for c in cmds:
+        k = c["k"]
+        if k == "space":
+            y += 14
+        elif k == "hr":
+            y += 8
+            rendered.append(("hr", y))
+            y += 22
+        elif k == "h":
+            lv = c["lv"]
+            f = hfont(lv)
+            fs = {1: 34, 2: 26, 3: 21}.get(lv, 21)
+            lh = int(fs * 1.35)
+            for wl in _wrap_text(c["t"], f, content_w):
+                rendered.append(("text", y, wl, f, accent_rgb if lv == 1 else fg, 0))
+                y += lh
+            y += 10
+        elif k == "p":
+            lh = int(18 * 1.6)
+            for wl in _wrap_text(c["t"], pfont, content_w):
+                rendered.append(("text", y, wl, pfont, fg, 0))
+                y += lh
+            y += 8
+        elif k == "li":
+            lh = int(18 * 1.6)
+            for i, wl in enumerate(_wrap_text(c["t"], pfont, content_w - 26)):
+                rendered.append(("text", y, ("•  " if i == 0 else "   ") + wl, pfont, fg, 0))
+                y += lh
+            y += 8
+        elif k == "quote":
+            lh = int(18 * 1.6)
+            wrapped = _wrap_text(c["t"], pfont, content_w - 30)
+            bh = lh * len(wrapped) + 18
+            rendered.append(("quote", y, bh))
+            for i, wl in enumerate(wrapped):
+                rendered.append(("text", y + 9 + i * lh, wl, pfont, sub, 18))
+            y += bh + 8
+        elif k == "code":
+            lh = int(15 * 1.6)
+            wrapped = []
+            for cl in c["lines"]:
+                wrapped += _wrap_text(cl, codefont, content_w - 24)
+            bh = lh * len(wrapped) + 16
+            rendered.append(("code", y, bh))
+            for i, wl in enumerate(wrapped):
+                rendered.append(("text", y + 8 + i * lh, wl, codefont, fg, 12))
+            y += bh + 10
+
+    total_h = max(y + pad, pad * 2 + 40)
+    img = Image.new("RGB", (width, total_h), bg)
+    d = ImageDraw.Draw(img)
+    for it in rendered:
+        if it[0] == "hr":
+            d.line([(pad, it[1]), (width - pad, it[1])], fill=sub, width=1)
+        elif it[0] == "quote":
+            d.rectangle([(pad, it[1]), (width - pad, it[1] + it[2])], fill=code_bg)
+            d.line([(pad, it[1]), (pad, it[1] + it[2])], fill=accent_rgb, width=4)
+        elif it[0] == "code":
+            d.rectangle([(pad, it[1]), (width - pad, it[1] + it[2])], fill=code_bg)
+        elif it[0] == "text":
+            _, yy, txt, f, color, indent = it
+            d.text((pad + indent, yy), txt, font=f, fill=color)
+
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+# ===================== 文本加解密 =====================
+try:
+    from Crypto.Cipher import AES
+    from Crypto.Util.Padding import pad, unpad
+    _CRYPTO_AVAILABLE = True
+except Exception:
+    _CRYPTO_AVAILABLE = False
+
+import base64 as _b64
+
+
+def text_cipher(text, *, mode="encrypt", method="base64", key="", encoding="utf-8"):
+    """文本加解密（纯本地、零上传）。
+    method: 'base64'（无需 key）、'aes-ecb' / 'aes-cbc'（需 key）。
+    返回处理后的字符串。
+    """
+    if not text:
+        raise ValueError("请输入要处理的文本")
+    enc = encoding or "utf-8"
+    if method == "base64":
+        if mode == "encrypt":
+            return _b64.b64encode(text.encode(enc)).decode("ascii")
+        try:
+            return _b64.b64decode(text.strip()).decode(enc)
+        except Exception:
+            raise ValueError("Base64 解码失败：内容不是合法 Base64")
+    if not _CRYPTO_AVAILABLE:
+        raise EnvironmentError("AES 需要 pycryptodome 库，请确认 requirements.txt 包含它")
+    if not key:
+        raise ValueError("AES 加密需要设置一个密钥")
+    kb = key.encode(enc)
+    if method in ("aes-ecb", "aes-cbc"):
+        k = (kb + b"\0" * 32)[:32]
+        if method == "aes-cbc":
+            iv = (kb + b"\0" * 16)[:16]
+            cipher = AES.new(k, AES.MODE_CBC, iv)
+        else:
+            cipher = AES.new(k, AES.MODE_ECB)
+        if mode == "encrypt":
+            return _b64.b64encode(cipher.encrypt(pad(text.encode(enc), 16))).decode("ascii")
+        try:
+            return unpad(cipher.decrypt(_b64.b64decode(text.strip())), 16).decode(enc)
+        except Exception:
+            raise ValueError("AES 解密失败：密钥或内容不正确")
+    raise ValueError("不支持的加密方式")
+
+
+# ===================== 在线计算器集合 =====================
+def calc_loan(principal, annual_rate_pct, months):
+    """等额本息房贷月供。返回 (月供, 总利息, 总还款)。"""
+    r = annual_rate_pct / 100.0 / 12.0
+    if r == 0:
+        m = principal / months
+        return round(m, 2), 0.0, round(principal, 2)
+    m = principal * r * (1 + r) ** months / ((1 + r) ** months - 1)
+    total = m * months
+    return round(m, 2), round(total - principal, 2), round(total, 2)
+
+
+def calc_bmi(weight_kg, height_cm):
+    """BMI。返回 (BMI 值, 分类)。"""
+    h = height_cm / 100.0
+    bmi = weight_kg / (h * h)
+    cat = "偏瘦" if bmi < 18.5 else "正常" if bmi < 24 else "偏胖" if bmi < 28 else "肥胖"
+    return round(bmi, 1), cat
+
+
+def calc_compound(principal, annual_rate_pct, years, freq=12):
+    """复利终值。freq=每年复利次数。"""
+    r = annual_rate_pct / 100.0 / freq
+    return round(principal * (1 + r) ** (years * freq), 2)
+
+
+def calc_installment(price, down_pct, annual_rate_pct, months):
+    """商品分期（等额本息）。返回 (首付, 贷款额, 月供, 总利息)。"""
+    down = price * down_pct / 100.0
+    loan = price - down
+    r = annual_rate_pct / 100.0 / 12.0
+    m = loan / months if r == 0 else loan * r * (1 + r) ** months / ((1 + r) ** months - 1)
+    total = m * months
+    return round(down, 2), round(loan, 2), round(m, 2), round(total - loan, 2)
+
+
+def calc_income_tax(monthly_salary, insurance=0):
+    """简化月度个税估算（免征额 5000，演示用）。返回 (应纳税所得额, 月均税额)。"""
+    taxable = max(monthly_salary - insurance - 5000, 0)
+    brackets = [(36000, 0.03), (144000, 0.10), (300000, 0.20),
+                (420000, 0.25), (660000, 0.30), (960000, 0.35), (10 ** 12, 0.45)]
+    annual, remain, tax_a, prev = taxable * 12, taxable * 12, 0.0, 0
+    for cap, rate in brackets:
+        seg = min(remain, cap - prev)
+        if seg <= 0:
+            prev = cap
+            continue
+        tax_a += seg * rate
+        remain -= seg
+        prev = cap
+        if remain <= 0:
+            break
+    return round(taxable, 2), round(tax_a / 12, 2)
+
+
+# ===================== 二维码解析 =====================
+try:
+    import numpy as np
+    import cv2
+    _CV2_AVAILABLE = True
+except Exception:
+    _CV2_AVAILABLE = False
+
+
+def qr_decode(image_bytes):
+    """解析图片中的二维码，返回内容字符串（首个）。纯本地 opencv，零上传。"""
+    if not _CV2_AVAILABLE:
+        raise EnvironmentError("二维码解析需要 opencv-python 库（requirements.txt 添加 opencv-python-headless）")
+    if not image_bytes:
+        raise ValueError("请上传一张含二维码的图片")
+    try:
+        arr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    except Exception:
+        raise ValueError("无法读取该图片，请换一张 PNG/JPG")
+    if img is None:
+        raise ValueError("无法读取该图片，请换一张 PNG/JPG")
+    data, _, _ = cv2.QRCodeDetector().detectAndDecode(img)
+    if not data:
+        raise ValueError("未检测到二维码，请换一张更清晰、完整的图")
+    return data
+
+
+# ===================== 语音转文字 =====================
+try:
+    from faster_whisper import WhisperModel
+    _WHISPER_AVAILABLE = True
+except Exception:
+    _WHISPER_AVAILABLE = False
+
+_WHISPER_MODEL = None
+
+
+def speech_to_text(audio_bytes, *, model_size="tiny", language="zh"):
+    """本地语音转文字（faster-whisper），与「文字转语音」对称。返回识别文本。零上传。"""
+    if not _WHISPER_AVAILABLE:
+        raise EnvironmentError("语音识别需要 faster-whisper 库（requirements.txt 添加 faster-whisper）")
+    if not audio_bytes:
+        raise ValueError("请先上传一段音频")
+    global _WHISPER_MODEL
+    if _WHISPER_MODEL is None:
+        _WHISPER_MODEL = WhisperModel(model_size, device="cpu", compute_type="int8")
+    import tempfile as _tf
+    tmp = _tf.NamedTemporaryFile(suffix=".wav", delete=False).name
+    with open(tmp, "wb") as f:
+        f.write(audio_bytes)
+    try:
+        segments, _ = _WHISPER_MODEL.transcribe(tmp, language=language)
+        return "".join(s.text for s in segments).strip()
+    finally:
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
+
+
+# ===================== 网页转图片截图 =====================
+try:
+    from playwright.sync_api import sync_playwright
+    _PLAYWRIGHT_AVAILABLE = True
+except Exception:
+    _PLAYWRIGHT_AVAILABLE = False
+
+
+def webpage_screenshot(url, *, width=1280, full_page=True, timeout=30000):
+    """把网页截图成图片（PNG 字节）。需要本地已安装 Playwright 浏览器。"""
+    if not _PLAYWRIGHT_AVAILABLE:
+        raise EnvironmentError("网页截图需要 playwright 库及浏览器（pip install playwright 后执行 playwright install chromium）")
+    if not url or not (url.startswith("http://") or url.startswith("https://")):
+        raise ValueError("请输入以 http:// 或 https:// 开头的网址")
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={"width": width, "height": 900})
+            page.goto(url, timeout=timeout, wait_until="networkidle")
+            png = page.screenshot(full_page=full_page)
+            browser.close()
+            return png
+    except Exception as e:
+        raise RuntimeError(f"截图失败：{e}（云端环境通常未预装浏览器，本功能建议在本地部署后使用）")
+
+
