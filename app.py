@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """小工具站: PDF转Excel / Excel公式机器人 / AI简历生成器 / 签证政策聚合 / 数据可视化 / Airtable导入 / AI配图生成器。
 对标 StarterStory 成功案例, 可一键部署到 Streamlit Cloud 获得公开网址。"""
+import io
+import zipfile
 import pandas as pd
 import streamlit as st
 from core import (
@@ -797,7 +799,6 @@ if st.session_state["active_tool"] == "grid":
         for i, p in enumerate(pieces):
             with d_cols[i % len(d_cols)]:
                 st.download_button(f"⬇️ {i+1}", data=p, file_name=f"grid_{i+1}.png", mime="image/png")
-        import zipfile
         zbuf = io.BytesIO()
         with zipfile.ZipFile(zbuf, "w") as z:
             for i, p in enumerate(pieces):
